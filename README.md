@@ -18,14 +18,15 @@ A production-quality, full-stack AI-powered Email Intelligence and Productivity 
 8. [ML Architecture](#ml-architecture)
 9. [Database Schema](#database-schema)
 10. [API Documentation](#api-documentation)
-11. [Installation](#installation)
-12. [Environment Variables](#environment-variables)
-13. [Running Locally](#running-locally)
-14. [Testing](#testing)
-15. [Deployment](#deployment)
-16. [Security & Privacy](#security--privacy)
-17. [Known Limitations](#known-limitations)
-18. [Future Improvements](#future-improvements)
+11. [Installation & Quick Start](#installation--quick-start)
+12. [Google OAuth 2.0 Setup](#google-oauth-20-setup-connecting-your-personal-gmail)
+13. [Environment Variables](#environment-variables-reference)
+14. [Testing & Quality Assurance](#testing--quality-assurance)
+15. [Application Pages & Modules](#application-pages--modules)
+16. [Deployment](#deployment)
+17. [Security & Privacy](#security--privacy)
+18. [Known Limitations](#known-limitations)
+19. [Future Improvements](#future-improvements)
 
 ---
 
@@ -372,134 +373,176 @@ Interactive docs available at: `http://localhost:8000/docs` (Swagger UI)
 
 ---
 
-## Installation
+## Installation & Quick Start
 
-### Prerequisites
-- Python 3.12+
-- Node.js 20+
-- PostgreSQL 16+ (or Docker)
-- Google Cloud project with Gmail API enabled
+### Option 1: One-Click Quick Start (Windows)
 
-### 1. Clone the repository
-```bash
-git clone https://github.com/yourusername/mailmind-ai.git
-cd mailmind-ai
-```
+We provide pre-configured launcher scripts:
 
-### 2. Configure environment
-```bash
-cp .env.example .env
-# Edit .env and fill in your values
-```
-
-### 3. Set up Google OAuth
-1. Go to [Google Cloud Console](https://console.cloud.google.com)
-2. Create a new project or select existing
-3. Enable the **Gmail API**
-4. Go to **APIs & Services → Credentials**
-5. Create **OAuth 2.0 Client ID** (Web application)
-6. Add authorized redirect URI: `http://localhost:8000/api/v1/auth/google/callback`
-7. Copy Client ID and Client Secret to `.env`
-
-> **Note**: For production distribution with restricted Gmail scopes, your app requires Google verification. For personal/portfolio use and testing (up to 100 users), you can use it unverified.
+1. Double-click **`start.bat`** (or right-click `start.ps1` → **Run with PowerShell**).
+2. Both the FastAPI backend (`http://localhost:8000`) and the Vite React frontend (`http://localhost:5173`) will launch in separate terminal windows.
+3. Open **[http://localhost:5173](http://localhost:5173)** in your browser.
+4. Click **"Explore with Demo Account"** to immediately explore the workspace without needing any API keys or Google Cloud setup!
 
 ---
 
-## Environment Variables
+### Option 2: Running Inside VS Code
 
-See [.env.example](.env.example) for the complete reference.
+The repository includes ready-to-use `.vscode/tasks.json` configuration:
 
-**Required for basic functionality:**
-```
-APP_SECRET_KEY          # Random secret (32+ chars)
-DATABASE_URL            # PostgreSQL connection string
-GOOGLE_CLIENT_ID        # From Google Cloud Console
-GOOGLE_CLIENT_SECRET    # From Google Cloud Console
-ENCRYPTION_KEY          # Fernet key for token encryption
-JWT_SECRET_KEY          # JWT signing secret
-```
-
-**Optional (enables AI features):**
-```
-AI_PROVIDER             # gemini | openai | (blank = disabled)
-GEMINI_API_KEY          # Google Gemini API key
-OPENAI_API_KEY          # OpenAI API key
-```
-
-**Generate required keys:**
-```bash
-# Encryption key
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-
-# JWT secret / App secret
-python -c "import secrets; print(secrets.token_urlsafe(32))"
-```
+1. Open the project folder in VS Code (`File` → `Open Folder...`).
+2. Press **`Ctrl + Shift + P`** (or `F1`) to open the Command Palette.
+3. Type **`Tasks: Run Task`** and press Enter.
+4. Select **`Run MailMind AI (Both Servers)`**.
+5. Both servers will launch in parallel inside your VS Code terminal!
 
 ---
 
-## Running Locally
+### Option 3: Manual Terminal Setup
 
-### Option A: Docker Compose (recommended)
+#### Prerequisites
+- **Python 3.12+** (tested on Python 3.14)
+- **Node.js 20+** (tested on Node.js 24)
+- **SQLite** (built-in, zero setup) or **PostgreSQL 16+** (via Docker)
 
-```bash
-# Copy and configure environment
-cp .env.example .env
-# (edit .env with your credentials)
-
-# Start all services
-docker compose up --build
-
-# Apply migrations
-docker compose exec backend alembic upgrade head
-
-# Train the ML model
-docker compose exec backend python ml/train.py
-```
-
-**Services:**
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:8000
-- API Docs: http://localhost:8000/docs
-- PostgreSQL: localhost:5432
-
-### Option B: Manual Setup
-
-**Backend:**
-```bash
+#### 1. Backend Setup
+```powershell
 cd backend
 
-# Create virtual environment
+# (Optional) Create virtual environment
 python -m venv .venv
-.venv\Scripts\activate      # Windows
-source .venv/bin/activate   # Linux/macOS
+.venv\Scripts\activate       # Windows
+# source .venv/bin/activate  # macOS/Linux
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Configure environment
-cp .env.example .env
-# (edit .env)
-
-# Apply database migrations
-alembic upgrade head
-
-# Train ML model
+# Train the Calibrated ML Classifier Model (generates ml/artifacts/model_v1.pkl)
 python ml/train.py
 
-# Start development server
-uvicorn app.main:app --reload --port 8000
+# Start FastAPI backend server
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
+> Backend runs at `http://localhost:8000`. Swagger API docs: `http://localhost:8000/docs`.
 
-**Frontend:**
-```bash
+#### 2. Frontend Setup
+```powershell
 cd frontend
 
-# Install dependencies
+# Install npm dependencies
 npm install
 
-# Start development server
+# Start Vite development server
 npm run dev
 ```
+> Frontend runs at `http://localhost:5173`.
+
+---
+
+## Google OAuth 2.0 Setup (Connecting Your Personal Gmail)
+
+MailMind AI supports two login options:
+1. **Instant Demo Access**: 1-click login as "Alex Morgan" with pre-loaded mock student & career emails across all 9 categories.
+2. **Real Gmail Sync**: Connects to your live Gmail inbox via Google OAuth 2.0.
+
+To connect your real Gmail account:
+
+1. Go to the **[Google Cloud Console](https://console.cloud.google.com/)**.
+2. Create a new project (e.g. `MailMind AI`).
+3. Enable the **Gmail API** in **APIs & Services → Library**.
+4. Configure the **OAuth consent screen**:
+   * Choose **External** user type.
+   * Add scopes: `.../auth/userinfo.email`, `.../auth/userinfo.profile`, `openid`, `.../auth/gmail.readonly`, and `.../auth/gmail.modify`.
+   * Under **Test users**, click **`+ ADD USERS`** and add your personal Gmail address (e.g. `yourname@gmail.com`).
+5. Go to **APIs & Services → Credentials**:
+   * Click **`+ CREATE CREDENTIALS`** → **OAuth client ID**.
+   * Application type: **Web application**.
+   * Under **Authorized JavaScript origins**, add: `http://localhost:5173`.
+   * Under **Authorized redirect URIs**, add:
+     ```text
+     http://localhost:8000/api/v1/auth/google/callback
+     ```
+6. Copy your **Client ID** and **Client Secret**, and paste them into `backend/.env`:
+   ```env
+   GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+   GOOGLE_CLIENT_SECRET=your-client-secret
+   ```
+7. When signing in, Google will show a standard *"Google hasn’t verified this app"* screen (normal for unverified personal dev apps). Click **`Continue`** to enter your dashboard!
+
+---
+
+## Environment Variables Reference
+
+A `.env` file in `backend/` supports both development (SQLite) and production (PostgreSQL):
+
+```env
+APP_ENV=development
+APP_NAME=MailMind AI
+APP_HOST=0.0.0.0
+APP_PORT=8000
+APP_DEBUG=true
+
+# Database (SQLite for zero-setup local dev; PostgreSQL for production/Docker)
+DATABASE_URL=sqlite+aiosqlite:///./mailmind.db
+# DATABASE_URL=postgresql+asyncpg://mailmind:mailmind_secret@localhost:5432/mailmind_db
+
+# Security & CORS
+CORS_ORIGINS=["http://localhost:5173", "http://localhost:3000"]
+APP_SECRET_KEY=mailmind-ai-secret-key-development-32-chars-minimum
+JWT_SECRET_KEY=mailmind-ai-jwt-secret-key-development-32-chars
+ML_MODEL_PATH=ml/artifacts/model_v1.pkl
+
+# Google OAuth 2.0 (Optional, required only for real Gmail sync)
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+GOOGLE_REDIRECT_URI=http://localhost:8000/api/v1/auth/google/callback
+
+# LLM Providers (Optional, heuristic fallbacks work 100% offline without API keys)
+AI_PROVIDER=gemini        # gemini | openai | (empty for heuristic fallback)
+GEMINI_API_KEY=
+OPENAI_API_KEY=
+```
+
+---
+
+## Testing & Quality Assurance
+
+### Automated Backend Tests
+Run the automated test suite covering API endpoints, ML classification, phishing detection, and priority scoring:
+
+```powershell
+cd backend
+python -m pytest tests/ -v
+```
+
+**Verified Test Suite:**
+- `tests/test_api.py` — Health check, development bypass login, authentication enforcement.
+- `tests/test_classifier.py` — ML inference, confidence calibration, taxonomy classification.
+- `tests/test_phishing.py` — Spoofed domain detection, credential harvesting alert, legitimate email pass-through.
+- `tests/test_priority.py` — Urgent keyword scoring, newsletter deprioritization.
+
+### Frontend Production Build
+```powershell
+cd frontend
+npm run build
+```
+Compiles TypeScript and bundles via Vite with zero type errors.
+
+---
+
+## Application Pages & Modules
+
+| Route | Page | Key Capabilities |
+|---|---|---|
+| `/login` | **Login & Landing** | Google OAuth 2.0 sign-in and 1-click Instant Demo Access. |
+| `/dashboard` | **Overview Dashboard** | KPI metrics, quick sync, recent priority inbox inflow, deadline reminders, career highlights. |
+| `/inbox` | **Inbox & Client** | Search with debounce, category & priority filtering, split view, phishing alert breakdown, AI summarization, suggested replies. |
+| `/important` | **Important Inflow** | Dedicated feed for critical & high priority messages and deadlines. |
+| `/categories` | **Category Taxonomy** | Explore emails classified into the 9 machine learning domains with real-time volume counts. |
+| `/tasks` | **Tasks & Deadlines** | Action items extracted from emails with due-date warnings, priority badges, and toggle completion. |
+| `/opportunities` | **Career Intelligence** | Student & Career pipeline tracking internships, placements, scholarships, and hackathons with status progression. |
+| `/analytics` | **Analytics & Telemetry** | Interactive Recharts visualizations for category distribution, priority breakdown, and 7-day email volume. |
+| `/settings` | **Settings & Security** | Gmail connection status, Fernet token encryption details, and Dark/Light theme mode. |
 
 ---
 

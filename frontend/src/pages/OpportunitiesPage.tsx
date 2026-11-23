@@ -2,17 +2,12 @@ import React, { useEffect, useState } from 'react'
 import {
   Briefcase,
   ExternalLink,
-  Calendar,
   DollarSign,
   GraduationCap,
-  Award,
   Clock,
-  CheckCircle2,
-  Filter,
 } from 'lucide-react'
 import { opportunitiesApi } from '@/api/opportunities'
 import type { Opportunity, OpportunityStatus } from '@/types'
-import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { useToast } from '@/hooks/useToast'
@@ -30,19 +25,15 @@ const PIPELINE_STATUSES: { id: OpportunityStatus; label: string }[] = [
 export const OpportunitiesPage: React.FC = () => {
   const toast = useToast()
   const [opportunities, setOpportunities] = useState<Opportunity[]>([])
-  const [isLoading, setIsLoading] = useState(true)
   const [selectedStatus, setSelectedStatus] = useState<string>('all')
   const [selectedType, setSelectedType] = useState<string>('all')
 
   const loadOpportunities = async () => {
-    setIsLoading(true)
     try {
       const res = await opportunitiesApi.listOpportunities()
       setOpportunities(res.data)
     } catch {
       toast.error('Failed to load opportunities.')
-    } finally {
-      setIsLoading(false)
     }
   }
 

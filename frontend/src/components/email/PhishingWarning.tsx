@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import type { PhishingRisk } from '@/types'
-import { ShieldAlert, ShieldCheck, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react'
+import { ShieldAlert, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react'
 
 export interface PhishingWarningProps {
   risk: PhishingRisk | string | null | undefined

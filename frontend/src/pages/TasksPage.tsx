@@ -5,9 +5,6 @@ import {
   Plus,
   Trash2,
   Clock,
-  Calendar,
-  AlertCircle,
-  Filter,
 } from 'lucide-react'
 import { tasksApi } from '@/api/tasks'
 import type { Task } from '@/types'
@@ -15,7 +12,6 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
-import { Badge } from '@/components/ui/Badge'
 import { PriorityBadge } from '@/components/email/PriorityBadge'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/hooks/useToast'
@@ -24,7 +20,6 @@ import { formatEmailDate } from '@/utils/date'
 export const TasksPage: React.FC = () => {
   const toast = useToast()
   const [tasks, setTasks] = useState<Task[]>([])
-  const [isLoading, setIsLoading] = useState(true)
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'completed'>('pending')
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [taskToDelete, setTaskToDelete] = useState<string | null>(null)
@@ -37,14 +32,11 @@ export const TasksPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const loadTasks = async () => {
-    setIsLoading(true)
     try {
       const res = await tasksApi.listTasks()
       setTasks(res.data)
     } catch {
       toast.error('Failed to load tasks.')
-    } finally {
-      setIsLoading(false)
     }
   }
 

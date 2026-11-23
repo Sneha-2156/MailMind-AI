@@ -6,12 +6,10 @@ import {
   Star,
   ShieldAlert,
   Sparkles,
-  Send,
   Copy,
   Check,
   Calendar,
   Briefcase,
-  AlertTriangle,
   X,
   ExternalLink,
 } from 'lucide-react'

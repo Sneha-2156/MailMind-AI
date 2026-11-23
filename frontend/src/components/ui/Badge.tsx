@@ -2,7 +2,7 @@ import React from 'react'
 
 export interface BadgeProps {
   children: React.ReactNode
-  variant?: 'default' | 'success' | 'warning' | 'danger' | 'info' | 'purple'
+  variant?: 'default' | 'success' | 'warning' | 'danger' | 'info' | 'purple' | 'outline'
   size?: 'sm' | 'md'
   dot?: boolean
   className?: string
@@ -33,6 +33,8 @@ export const Badge: React.FC<BadgeProps> = ({
       'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800/50',
     purple:
       'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border-purple-200 dark:border-purple-800/50',
+    outline:
+      'bg-transparent text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700',
   }
 
   const dotClasses = {
@@ -42,6 +44,7 @@ export const Badge: React.FC<BadgeProps> = ({
     danger: 'bg-red-500',
     info: 'bg-indigo-500',
     purple: 'bg-purple-500',
+    outline: 'bg-slate-400',
   }
 
   return (

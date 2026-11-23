@@ -6,7 +6,6 @@ import {
   Mail,
   Moon,
   Sun,
-  Key,
   CheckCircle2,
   RefreshCw,
 } from 'lucide-react'

@@ -6,8 +6,6 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
   Cell,
   AreaChart,
   Area,
@@ -42,7 +40,6 @@ export const AnalyticsPage: React.FC = () => {
   const [categories, setCategories] = useState<CategoryDistributionItem[]>([])
   const [priorities, setPriorities] = useState<PriorityDistributionItem[]>([])
   const [activity, setActivity] = useState<WeeklyActivityItem[]>([])
-  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     Promise.all([
@@ -56,7 +53,6 @@ export const AnalyticsPage: React.FC = () => {
         setActivity(actRes.data)
       })
       .catch(() => toast.error('Failed to load analytics metrics.'))
-      .finally(() => setIsLoading(false))
   }, [])
 
   const totalClassified = categories.reduce((sum, item) => sum + item.count, 0)
@@ -137,7 +133,7 @@ export const AnalyticsPage: React.FC = () => {
                   }}
                 />
                 <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-                  {categories.map((entry, index) => (
+                  {categories.map((_, index) => (
                     <Cell key={`cell-${index}`} fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} />
                   ))}
                 </Bar>

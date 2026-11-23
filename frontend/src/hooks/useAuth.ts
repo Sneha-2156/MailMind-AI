@@ -8,8 +8,8 @@ export const useAuth = () => {
   const initiateGoogleLogin = useCallback(async () => {
     try {
       const res = await authApi.getAuthorizeUrl()
-      if (res.data?.auth_url) {
-        window.location.href = res.data.auth_url
+      if (res.data?.authorization_url) {
+        window.location.href = res.data.authorization_url
       }
     } catch (err) {
       console.error('Failed to get authorization URL:', err)

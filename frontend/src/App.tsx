@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react'
-import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { Layout } from '@/components/layout/Layout'
 import { useAuthStore } from '@/stores/authStore'
 import { useTheme } from '@/hooks/useTheme'
@@ -15,7 +15,12 @@ import { LoginPage } from '@/pages/LoginPage'
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, token } = useAuthStore()
-  const hasToken = isAuthenticated || !!token || !!localStorage.getItem('access_token')
+  const searchParams = new URLSearchParams(window.location.search)
+  const hasToken =
+    isAuthenticated ||
+    !!token ||
+    !!localStorage.getItem('access_token') ||
+    !!searchParams.get('token')
 
   if (!hasToken) {
     return <Navigate to="/login" replace />

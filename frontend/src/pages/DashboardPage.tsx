@@ -3,10 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import {
   Mail,
   Inbox,
-  Star,
   CheckSquare,
   Briefcase,
-  AlertTriangle,
   ArrowRight,
   RefreshCw,
   Clock,
@@ -15,6 +13,7 @@ import {
 import { useAuth } from '@/hooks/useAuth'
 import { useToast } from '@/hooks/useToast'
 import { emailsApi } from '@/api/emails'
+import { gmailApi } from '@/api/gmail'
 import { tasksApi } from '@/api/tasks'
 import { opportunitiesApi } from '@/api/opportunities'
 import { analyticsApi } from '@/api/analytics'
@@ -31,7 +30,6 @@ export const DashboardPage: React.FC = () => {
   const toast = useToast()
   const navigate = useNavigate()
 
-  const [isLoading, setIsLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null)
   const [recentEmails, setRecentEmails] = useState<Email[]>([])
@@ -39,7 +37,6 @@ export const DashboardPage: React.FC = () => {
   const [recentOpps, setRecentOpps] = useState<Opportunity[]>([])
 
   const loadDashboardData = async () => {
-    setIsLoading(true)
     try {
       const [sumRes, emailsRes, tasksRes, oppsRes] = await Promise.all([
         analyticsApi.getSummary(),
@@ -53,8 +50,6 @@ export const DashboardPage: React.FC = () => {
       setRecentOpps(oppsRes.data.slice(0, 3))
     } catch {
       toast.error('Failed to load dashboard data.')
-    } finally {
-      setIsLoading(false)
     }
   }
 
@@ -65,19 +60,8 @@ export const DashboardPage: React.FC = () => {
   const handleSync = async () => {
     setIsSyncing(true)
     try {
-      await emailsApi.listEmails() // verify connection
-      const syncRes = await fetch(
-        (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000') + '/api/v1/emails/sync',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${localStorage.getItem('access_token') || ''}`,
-          },
-        }
-      )
-      const data = await syncRes.json()
-      toast.success(`Sync complete: ${data.synced_count || 0} emails processed!`)
+      const res = await gmailApi.syncEmails()
+      toast.success(`Sync complete: ${res.data.synced_count || 0} emails processed!`)
       loadDashboardData()
     } catch {
       toast.error('Sync failed. Please try again.')

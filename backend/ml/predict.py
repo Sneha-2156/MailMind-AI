@@ -26,8 +26,12 @@ def load_model(path: str) -> dict | None:
         dict: Bundle containing {'model': pipeline, 'categories': list, 'metadata': dict}
     """
     if not os.path.exists(path):
-        logger.warning("Classifier model bundle not found at %s", path)
-        return None
+        fallback_path = os.path.join(os.path.dirname(__file__), "artifacts", "model_v1.pkl")
+        if os.path.exists(fallback_path):
+            path = fallback_path
+        else:
+            logger.warning("Classifier model bundle not found at %s", path)
+            return None
     try:
         bundle = joblib.load(path)
         logger.info("Successfully loaded model bundle from %s", path)

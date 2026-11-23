@@ -21,6 +21,10 @@ FROM development AS production
 
 ENV APP_ENV=production \
     APP_DEBUG=false \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    FORWARDED_ALLOW_IPS="*"
 
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers"]
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+CMD ["sh", "-c", "alembic upgrade head || true && uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers"]

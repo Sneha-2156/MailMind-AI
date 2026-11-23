@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { emailsApi } from '@/api/emails'
 import { useEmailStore } from '@/stores/emailStore'
-import type { Email, Priority } from '@/types'
+import type { Priority } from '@/types'
 
 export const useEmails = () => {
   const { emails, setEmails, updateEmail, filters, pagination, setPagination } = useEmailStore()
@@ -137,10 +137,13 @@ export const useEmails = () => {
     emails,
     isLoading,
     error,
+    fetchEmails: (pageToLoad = 1) => fetchEmails(pageToLoad, false),
     refetch: () => fetchEmails(1, false),
     loadMore,
     markRead,
+    markAsRead: markRead,
     markImportant,
+    markAsImportant: markImportant,
     markSpam,
     updateCategory,
     updatePriority,

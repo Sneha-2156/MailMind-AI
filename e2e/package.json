@@ -1,0 +1,11 @@
+{
+  "name": "mailmind-ai-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "npx playwright test",
+    "test:ui": "npx playwright test --ui",
+    "test:report": "npx playwright show-report"
+  }
+}

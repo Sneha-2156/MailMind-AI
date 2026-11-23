@@ -29,6 +29,11 @@ settings = get_settings()
 @router.get("/google/authorize")
 async def google_auth_login():
     """Initiate Google OAuth 2.0 flow."""
+    if not settings.GOOGLE_CLIENT_ID or "your-google" in settings.GOOGLE_CLIENT_ID:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Google OAuth is not configured yet. Please set GOOGLE_CLIENT_ID in backend/.env, or use 'Explore with Demo Account' below for instant access.",
+        )
     state = generate_oauth_state()
     url = get_authorization_url(state)
     return {"authorization_url": url, "state": state}
@@ -122,7 +127,11 @@ async def google_auth_callback(
     jwt_token = create_access_token(data={"sub": str(user.id), "email": user.email})
 
     # Redirect to frontend dashboard with token
-    redirect_url = f"{settings.CORS_ORIGINS[0]}/login?token={jwt_token}"
+    frontend_base = (
+        settings.FRONTEND_URL
+        or (settings.CORS_ORIGINS[0] if settings.CORS_ORIGINS else "http://localhost:5173")
+    ).rstrip("/")
+    redirect_url = f"{frontend_base}/dashboard?token={jwt_token}"
     response = RedirectResponse(url=redirect_url)
     response.set_cookie(
         key="access_token",
@@ -137,7 +146,7 @@ async def google_auth_callback(
 @router.post("/dev-login")
 async def dev_login(response: Response, db: AsyncSession = Depends(get_db)):
     """Instant login endpoint for local development and portfolio demonstration."""
-    if settings.APP_ENV.lower() == "production":
+    if settings.APP_ENV.lower() == "production" and not settings.ENABLE_DEMO_LOGIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Demo login is disabled in production.",

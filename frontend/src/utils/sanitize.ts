@@ -18,7 +18,6 @@ export const sanitizeEmailHtml = (html: string | null | undefined): string => {
       'blockquote', 'table', 'tbody', 'thead', 'tr', 'td', 'th', 'hr', 'pre', 'code'
     ],
     ALLOWED_ATTR: ['href', 'class', 'style', 'title', 'target', 'rel'],
-    FORBID_SCRIPTS: true,
     FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input'],
   })
 

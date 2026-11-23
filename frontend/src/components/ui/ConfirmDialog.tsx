@@ -6,7 +6,8 @@ import { AlertTriangle, HelpCircle } from 'lucide-react'
 export interface ConfirmDialogProps {
   isOpen: boolean
   onConfirm: () => void
-  onCancel: () => void
+  onCancel?: () => void
+  onClose?: () => void
   title: string
   message: string
   confirmLabel?: string
@@ -19,6 +20,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   isOpen,
   onConfirm,
   onCancel,
+  onClose,
   title,
   message,
   confirmLabel = 'Confirm',
@@ -26,15 +28,17 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   variant = 'default',
   isLoading = false,
 }) => {
+  const handleClose = onCancel || onClose || (() => {})
+
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onCancel}
+      onClose={handleClose}
       title={title}
       size="sm"
       footer={
         <>
-          <Button variant="ghost" size="sm" onClick={onCancel} disabled={isLoading}>
+          <Button variant="ghost" size="sm" onClick={handleClose} disabled={isLoading}>
             {cancelLabel}
           </Button>
           <Button

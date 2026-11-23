@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Tag, Mail, ArrowRight } from 'lucide-react'
+import { Tag } from 'lucide-react'
 import { CATEGORIES } from '@/types'
 import { CategoryBadge } from '@/components/email/CategoryBadge'
 import { EmailList } from '@/components/email/EmailList'
@@ -8,7 +8,6 @@ import { emailsApi } from '@/api/emails'
 import { analyticsApi } from '@/api/analytics'
 import type { Email } from '@/types'
 import { useToast } from '@/hooks/useToast'
-import { Card } from '@/components/ui/Card'
 
 const CATEGORY_DESCRIPTIONS: Record<string, string> = {
   Academic: 'Course syllabi, lecture schedules, exam notices, and professor communications.',
@@ -145,7 +144,7 @@ export const CategoriesPage: React.FC = () => {
             <EmailDetail
               email={selectedEmail}
               onClose={() => setSelectedEmail(null)}
-              onUpdateEmail={(id, updates) => {
+              onUpdateEmail={(_id, updates) => {
                 setSelectedEmail({ ...selectedEmail, ...updates })
               }}
             />

@@ -78,12 +78,13 @@ export const EmailCard: React.FC<EmailCardProps> = ({
             </h4>
 
             {email.phishing_risk && email.phishing_risk !== 'none' && (
-              <ShieldAlert
-                className={`w-3.5 h-3.5 shrink-0 ${
-                  email.phishing_risk === 'high' ? 'text-red-500' : 'text-amber-500'
-                }`}
-                title={`Security warning: ${email.phishing_risk} risk detected`}
-              />
+              <span title={`Security warning: ${email.phishing_risk} risk detected`}>
+                <ShieldAlert
+                  className={`w-3.5 h-3.5 shrink-0 ${
+                    email.phishing_risk === 'high' ? 'text-red-500' : 'text-amber-500'
+                  }`}
+                />
+              </span>
             )}
           </div>
 

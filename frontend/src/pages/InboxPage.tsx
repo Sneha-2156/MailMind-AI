@@ -2,24 +2,19 @@ import React, { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   Search,
-  Filter,
   RefreshCw,
-  Mail,
-  Star,
-  ShieldAlert,
   ChevronLeft,
   ChevronRight,
   Inbox as InboxIcon,
-  X,
 } from 'lucide-react'
 import { useEmails } from '@/hooks/useEmails'
 import { useEmailStore } from '@/stores/emailStore'
 import { useToast } from '@/hooks/useToast'
 import { emailsApi } from '@/api/emails'
+import { gmailApi } from '@/api/gmail'
 import { EmailList } from '@/components/email/EmailList'
 import { EmailDetail } from '@/components/email/EmailDetail'
 import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
 import { CATEGORIES } from '@/types'
 import type { Email, Priority } from '@/types'
 
@@ -76,18 +71,8 @@ export const InboxPage: React.FC = () => {
   const handleManualSync = async () => {
     setSyncing(true)
     try {
-      const syncRes = await fetch(
-        (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000') + '/api/v1/emails/sync',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${localStorage.getItem('access_token') || ''}`,
-          },
-        }
-      )
-      const data = await syncRes.json()
-      toast.success(`Sync complete: ${data.synced_count || 0} emails processed!`)
+      const res = await gmailApi.syncEmails()
+      toast.success(`Sync complete: ${res.data.synced_count || 0} emails processed!`)
       fetchEmails(1)
     } catch {
       toast.error('Sync failed. Please check connection.')
@@ -258,7 +243,7 @@ export const InboxPage: React.FC = () => {
             <EmailDetail
               email={selectedEmail}
               onClose={handleCloseDetail}
-              onUpdateEmail={(id, updates) => {
+              onUpdateEmail={(_id, updates) => {
                 setSelectedEmail({ ...selectedEmail, ...updates })
               }}
             />

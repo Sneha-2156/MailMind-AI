@@ -1,10 +1,8 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Mail,
-  Shield,
   Sparkles,
-  Briefcase,
   CheckCircle,
   ArrowRight,
   Lock,
@@ -12,7 +10,6 @@ import {
 import { authApi } from '@/api/auth'
 import { useAuthStore } from '@/stores/authStore'
 import { useToast } from '@/hooks/useToast'
-import { Button } from '@/components/ui/Button'
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate()
@@ -21,6 +18,23 @@ export const LoginPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [isDemoLoading, setIsDemoLoading] = useState(false)
 
+  useEffect(() => {
+    // Check if token was returned via OAuth callback redirect
+    const searchParams = new URLSearchParams(window.location.search)
+    const urlToken = searchParams.get('token')
+    if (urlToken) {
+      localStorage.setItem('access_token', urlToken)
+      setToken(urlToken)
+      toast.success('Successfully authenticated with Google!')
+      navigate('/dashboard', { replace: true })
+      return
+    }
+
+    if (localStorage.getItem('access_token')) {
+      navigate('/dashboard', { replace: true })
+    }
+  }, [navigate, setToken, toast])
+
   const handleGoogleLogin = async () => {
     setIsLoading(true)
     try {
@@ -28,8 +42,11 @@ export const LoginPage: React.FC = () => {
       if (res.data.authorization_url) {
         window.location.href = res.data.authorization_url
       }
-    } catch {
-      toast.error('Google OAuth initialization failed. Try Demo Access below.')
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.detail ||
+        'Google OAuth is not configured yet. Please use "Explore with Demo Account" below!'
+      toast.error(msg)
     } finally {
       setIsLoading(false)
     }

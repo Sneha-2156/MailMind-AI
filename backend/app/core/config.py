@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     SESSION_COOKIE_SECURE: bool = False
     SESSION_COOKIE_SAMESITE: str = "lax"
     CORS_ORIGINS: Union[list[str], str] = ["http://localhost:5173", "http://localhost:3000"]
+    FRONTEND_URL: str = ""
+    ENABLE_DEMO_LOGIN: bool = True
 
     AI_PROVIDER: str = ""
     GEMINI_API_KEY: str = ""
@@ -60,7 +62,18 @@ class Settings(BaseSettings):
     @classmethod
     def assemble_cors_origins(cls, v: Union[str, list[str]]) -> list[str]:
         if isinstance(v, str):
-            return [item.strip() for item in v.split(",") if item.strip()]
+            v = v.strip()
+            if v.startswith("[") and v.endswith("]"):
+                import json
+                try:
+                    parsed = json.loads(v)
+                    if isinstance(parsed, list):
+                        return [str(item).strip().strip("'\"") for item in parsed if item]
+                except Exception:
+                    pass
+            return [item.strip().strip("'\"") for item in v.split(",") if item.strip()]
+        elif isinstance(v, list):
+            return [str(item).strip().strip("'\"") for item in v if item]
         return v
 
 

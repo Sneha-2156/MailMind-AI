@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Star, ShieldAlert, ArrowLeft } from 'lucide-react'
+import { Star } from 'lucide-react'
 import { emailsApi } from '@/api/emails'
 import type { Email } from '@/types'
 import { EmailList } from '@/components/email/EmailList'
@@ -81,7 +81,7 @@ export const ImportantPage: React.FC = () => {
             <EmailDetail
               email={selectedEmail}
               onClose={() => setSelectedEmail(null)}
-              onUpdateEmail={(id, updates) => {
+              onUpdateEmail={(_id, updates) => {
                 setSelectedEmail({ ...selectedEmail, ...updates })
               }}
             />

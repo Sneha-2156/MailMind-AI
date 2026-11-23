@@ -1,0 +1,100 @@
+version: "3.9"
+
+# ============================================================
+# MailMind AI — Production Docker Compose
+# Deploy: docker compose -f docker-compose.prod.yml up -d --build
+# ============================================================
+
+services:
+  # ----------------------------------------------------------
+  # PostgreSQL 16 Database
+  # ----------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: mailmind_prod_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME:-mailmind_db}
+      POSTGRES_USER: ${DATABASE_USER:-mailmind}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-mailmind_secret}
+    volumes:
+      - prod_postgres_data:/var/lib/postgresql/data
+      - ./backend/scripts/init_db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-mailmind} -d ${DATABASE_NAME:-mailmind_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mailmind_prod_net
+
+  # ----------------------------------------------------------
+  # FastAPI Backend (Production target)
+  # ----------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: mailmind_prod_backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${DATABASE_USER:-mailmind}:${DATABASE_PASSWORD:-mailmind_secret}@postgres:5432/${DATABASE_NAME:-mailmind_db}
+      APP_ENV: production
+      APP_DEBUG: "false"
+    expose:
+      - "8000"
+    volumes:
+      - prod_ml_artifacts:/app/ml/artifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - mailmind_prod_net
+
+  # ----------------------------------------------------------
+  # Nginx + Built React Frontend (Production target)
+  # ----------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+      args:
+        VITE_API_BASE_URL: ""
+    container_name: mailmind_prod_frontend
+    restart: unless-stopped
+    ports:
+      - "${PROD_PORT:-80}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - mailmind_prod_net
+
+# ----------------------------------------------------------
+# Named Volumes & Networks
+# ----------------------------------------------------------
+volumes:
+  prod_postgres_data:
+    name: mailmind_prod_postgres_data
+  prod_ml_artifacts:
+    name: mailmind_prod_ml_artifacts
+
+networks:
+  mailmind_prod_net:
+    name: mailmind_prod_network
+    driver: bridge
