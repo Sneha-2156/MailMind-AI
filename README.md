@@ -8,7 +8,7 @@ A production-quality, full-stack AI-powered Email Intelligence and Productivity 
 
 ## Table of Contents
 
-1. [Project Overview](#project-overview)
+1. [Project Overview](#project-overview) 
 2. [Problem Statement](#problem-statement)
 3. [Features](#features)
 4. [Screenshots](#screenshots)
@@ -703,5 +703,6 @@ See [LICENSE](LICENSE) for details.
 
 *Built with ❤️ as a serious software engineering portfolio project.*
 "# MailMind-AI" 
-#   M a i l M i n d - A I  
- 
+#� �M�a�i�l�M�i�n�d�-�A�I�
+�
+�
