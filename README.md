@@ -1,432 +1,428 @@
-# MailMind AI
+# 📬 MailMind AI
 
-> **Your inbox, intelligently understood.**
+<p align="center">
+  <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/mail-check.svg" width="80" height="80" alt="MailMind AI Logo" />
+</p>
 
-A production-quality, full-stack AI-powered Email Intelligence and Productivity Platform. Built as a serious software engineering portfolio project demonstrating full-stack development, ML engineering, OAuth integration, security engineering, and professional UI/UX.
+<h3 align="center">Your inbox, intelligently understood.</h3>
 
----
+<p align="center">
+  A production-grade, full-stack AI Email Intelligence and Career Productivity Platform.<br />
+  Combines calibrated machine learning, automated opportunity extraction, multi-signal priority detection, phishing defense, and modern UI/UX to transform inbox overload into structured, actionable intelligence.
+</p>
 
-## Table of Contents
-
-1. [Project Overview](#project-overview) 
-2. [Problem Statement](#problem-statement)
-3. [Features](#features)
-4. [Screenshots](#screenshots)
-5. [Architecture](#architecture)
-6. [Technology Stack](#technology-stack)
-7. [Application Workflow](#application-workflow)
-8. [ML Architecture](#ml-architecture)
-9. [Database Schema](#database-schema)
-10. [API Documentation](#api-documentation)
-11. [Installation & Quick Start](#installation--quick-start)
-12. [Google OAuth 2.0 Setup](#google-oauth-20-setup-connecting-your-personal-gmail)
-13. [Environment Variables](#environment-variables-reference)
-14. [Testing & Quality Assurance](#testing--quality-assurance)
-15. [Application Pages & Modules](#application-pages--modules)
-16. [Deployment](#deployment)
-17. [Security & Privacy](#security--privacy)
-18. [Known Limitations](#known-limitations)
-19. [Future Improvements](#future-improvements)
+<p align="center">
+  <a href="#-key-features"><img src="https://img.shields.io/badge/Status-Production--Ready-emerald?style=for-the-badge" alt="Status" /></a>
+  <a href="#-technology-stack"><img src="https://img.shields.io/badge/Python-3.12%2B-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python" /></a>
+  <a href="#-technology-stack"><img src="https://img.shields.io/badge/FastAPI-0.115%2B-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" /></a>
+  <a href="#-technology-stack"><img src="https://img.shields.io/badge/React-19.0-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React 19" /></a>
+  <a href="#-technology-stack"><img src="https://img.shields.io/badge/TypeScript-5.6-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" /></a>
+  <a href="#-technology-stack"><img src="https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="Tailwind CSS" /></a>
+  <a href="#-license"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="License" /></a>
+</p>
 
 ---
 
-## Project Overview
+## 📑 Table of Contents
 
-MailMind AI connects to a user's Gmail account via secure Google OAuth 2.0, intelligently classifies incoming emails using a trained machine learning model, extracts actionable tasks and deadlines, identifies career and academic opportunities, generates AI-powered summaries, detects phishing, and presents everything through a premium React dashboard.
-
-The platform is specifically designed to serve **students and job seekers**, providing a dedicated Career Intelligence module that surfaces internships, placements, scholarships, hackathons, and application deadlines automatically from their email.
-
----
-
-## Problem Statement
-
-The average person receives 120+ emails per day. For students, this includes a mix of:
-- Academic announcements and exam schedules
-- Internship and job opportunities with tight deadlines
-- Scholarship notifications
-- Financial reminders
-- Promotional noise and spam
-
-Manually sorting through this is time-consuming and leads to missed opportunities. MailMind AI automates the classification, prioritization, and information extraction — turning raw email into structured, actionable intelligence.
-
----
-
-## Features
-
-### Core Platform
-- 🔐 **Google OAuth 2.0** — Secure sign-in. Never stores Gmail passwords.
-- 📧 **Gmail Integration** — Real Gmail API sync with deduplication and label operations.
-- 🧠 **ML Email Classification** — LinearSVC + TF-IDF classifying emails into 9 categories.
-- ⚡ **Smart Priority Detection** — Multi-signal scoring: Critical, High, Medium, Low.
-- 🤖 **AI Summarization** — Structured summaries with key points, action items, and deadlines (optional LLM).
-- 📋 **Task & Deadline Extraction** — Automatically extracts tasks from emails into a managed task list.
-- 🎓 **Career & Student Intelligence** — Dedicated dashboard for opportunities with status tracking.
-- 💬 **Smart Reply Generator** — Draft professional replies in multiple styles (never auto-sends).
-- 🛡️ **Phishing Detection** — Explainable security analysis with risk levels and reasons.
-- 🔍 **Advanced Search** — Filter by sender, subject, category, priority, date, read status.
-- 📊 **Real Analytics Dashboard** — Charts from actual database data (zero hardcoded metrics).
-
-### Technical Highlights
-- **Multi-user isolation**: Every endpoint enforces user ownership. IDOR-proof.
-- **OAuth tokens encrypted at rest**: Fernet encryption before database storage.
-- **Sanitized HTML rendering**: DOMPurify + allowlist-based HTML sanitization.
-- **Graceful AI fallbacks**: App is fully functional without an LLM API key.
-- **Calibrated ML confidence**: CalibratedClassifierCV prevents inflated probability claims.
-- **Responsive design**: Mobile, tablet, and desktop layouts.
-- **Dark/Light mode**: Full theme support with system preference detection.
+- [Overview & Problem Statement](#-overview--problem-statement)
+- [Key Features](#-key-features)
+- [System Architecture](#-system-architecture)
+- [Machine Learning Pipeline](#-machine-learning-pipeline)
+- [Database Schema & Data Models](#-database-schema--data-models)
+- [REST API Reference](#-rest-api-reference)
+- [Technology Stack](#-technology-stack)
+- [Installation & Quick Start](#-installation--quick-start)
+  - [Option 1: One-Click Quick Start (Windows)](#option-1-one-click-quick-start-windows)
+  - [Option 2: VS Code Task Runner](#option-2-vs-code-task-runner)
+  - [Option 3: Manual Terminal Setup](#option-3-manual-terminal-setup)
+- [Google OAuth 2.0 Configuration](#-google-oauth-20-configuration)
+- [Environment Variables](#-environment-variables)
+- [Testing & Quality Assurance](#-testing--quality-assurance)
+- [Security & Privacy Blueprint](#-security--privacy-blueprint)
+- [Project Directory Structure](#-project-directory-structure)
+- [License & Contributing](#-license--contributing)
 
 ---
 
-## Architecture
+## 💡 Overview & Problem Statement
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        MailMind AI Platform                          │
-├──────────────┬───────────────────────────┬──────────────────────────┤
-│   Browser    │       Backend             │    External Services      │
-│              │                           │                           │
-│  React 19    │  FastAPI (Python 3.12)    │  Gmail API (REST)         │
-│  TypeScript  │  ┌─────────────────────┐ │  Google OAuth 2.0         │
-│  Tailwind    │  │ API Layer (v1)       │ │  Gemini API (optional)    │
-│  Zustand     │  │ auth / emails /      │ │  OpenAI API (optional)    │
-│  Recharts    │  │ tasks / opp /        │ │                           │
-│              │  │ analytics / search   │ │                           │
-│              │  ├─────────────────────┤ │                           │
-│              │  │ Service Layer        │ │                           │
-│              │  │ gmail / classifier / │ │                           │
-│              │  │ priority / phishing  │ │                           │
-│              │  │ summarizer /         │ │                           │
-│              │  │ extraction / reply   │ │                           │
-│              │  ├─────────────────────┤ │                           │
-│              │  │ ML Pipeline          │ │                           │
-│              │  │ LinearSVC + TF-IDF   │ │                           │
-│              │  │ CalibratedClassifier │ │                           │
-│              │  ├─────────────────────┤ │                           │
-│              │  │ SQLAlchemy ORM       │ │                           │
-│              │  └─────────────────────┘ │                           │
-│              │           │               │                           │
-│              │    PostgreSQL 16          │                           │
-└──────────────┴───────────────────────────┴──────────────────────────┘
-```
+The average student, researcher, or professional receives **120+ emails every day**. For students and job seekers in particular, inboxes are flooded with a chaotic mix of:
+- **Academic notices**: Exam timetables, curriculum revisions, faculty announcements.
+- **Career opportunities**: Internships, placement drives, hackathons, and fellowship deadlines.
+- **Financial reminders**: Fee deadlines, scholarship disbarments, stipend forms.
+- **Security threats**: Coercive phishing links and brand-spoofed credential harvesters.
+- **Promotional noise**: Automated newsletters and irrelevant marketing blasts.
+
+Manually sorting, tagging, and following up on every message leads to missed career deadlines, lost opportunities, and cognitive fatigue.
+
+**MailMind AI** solves this problem end-to-end. It connects securely to Gmail via Google OAuth 2.0, ingests and deduplicates emails, classifies them into **9 specialized categories** using a calibrated ML model, computes a multi-signal priority rating, detects potential phishing threats, extracts tasks and application deadlines, and renders actionable summaries inside a dashboard designed with React and Tailwind CSS.
 
 ---
 
-## Technology Stack
+## ✨ Key Features
 
-### Frontend
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| React | 19.x | UI framework |
-| TypeScript | 5.x | Type safety |
-| Vite | 5.x | Build tool & dev server |
-| Tailwind CSS | 3.x | Styling |
-| React Router | 6.x | Client-side routing |
-| Zustand | 5.x | State management |
-| Axios | 1.x | HTTP client |
-| Recharts | 2.x | Analytics charts |
-| Lucide React | 0.x | Icons |
-| Framer Motion | 11.x | Animations |
-| DOMPurify | 3.x | HTML sanitization |
-| date-fns | 4.x | Date formatting |
+### 🧠 Calibrated ML Email Classifier
+- **9-Class Specialized Taxonomy**: Normalized categories covering Academic, Administration, Campus Service, Career and Opportunity, Financial Services, Service Notification, Scholarship, Skill Development, and Miscellaneous.
+- **Calibrated Probabilities**: Uses `CalibratedClassifierCV` with sigmoid calibration on top of a `LinearSVC` + `TfidfVectorizer` pipeline to generate genuine confidence scores rather than uncalibrated margin distances.
+- **Feature Explainability**: Identifies the top TF-IDF n-grams that triggered the prediction, providing transparent classification reasoning for every email.
 
-### Backend
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| Python | 3.12 | Runtime |
-| FastAPI | 0.115 | Web framework |
-| SQLAlchemy | 2.x | ORM (async) |
-| Alembic | 1.13 | Database migrations |
-| Pydantic | 2.x | Data validation |
-| PostgreSQL | 16 | Primary database |
-| asyncpg | 0.29 | Async PostgreSQL driver |
-| google-api-python-client | 2.x | Gmail API |
-| python-jose | 3.x | JWT tokens |
-| cryptography | 43.x | Token encryption (Fernet) |
-| httpx | 0.27 | Async HTTP client |
-| Pytest | 8.x | Testing |
+### ⚡ Smart Multi-Signal Priority Engine
+- Evaluates urgency, sender authority, imminent deadlines, and category weights across four tiers:
+  - 🔴 **Critical**: Urgent action required, deadlines within 24–48 hours, or official administration summons.
+  - 🟠 **High**: Important career opportunities, scheduled interviews, and scholarship notifications.
+  - 🟡 **Medium**: General academic coursework, team updates, and regular notifications.
+  - ⚪ **Low**: Newsletters, promotional circulars, and system notifications.
 
-### Machine Learning
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| scikit-learn | 1.5 | ML model |
-| LinearSVC | - | Email classifier |
-| TF-IDF | - | Feature extraction |
-| CalibratedClassifierCV | - | Probability calibration |
-| Pandas | 2.x | Data processing |
-| NumPy | 1.26 | Numerical operations |
+### 🎓 Career & Student Intelligence Module
+- Automatically mines emails for career advancements: **Internships, Job Openings, Hackathons, Placements, and Scholarships**.
+- Extracts company names, job roles, stipend/compensation, work mode (remote/onsite), eligibility criteria, application links, and deadlines.
+- Dedicated **Kanban/Status Tracking funnel**: `New` → `Saved` → `Applied` → `Assessment` → `Interview` → `Offer` / `Rejected`.
 
-### Infrastructure
-| Technology | Purpose |
-|------------|---------|
-| Docker | Containerization |
-| Docker Compose | Local orchestration |
-| GitHub Actions | CI/CD |
-| Playwright | E2E testing |
+### 📋 Automated Task & Deadline Extraction
+- Detects action verbs, explicit deadlines, and assignment commitments from unstructured message bodies.
+- Converts emails into manageable tasks with due dates, priority tags, and completion checkboxes.
+
+### 🛡️ Heuristic Phishing & Spoofing Defense
+- **Explainable Threat Analysis**: Evaluates sender display-name mismatches, lookalike domains, suspicious TLDs, IP-based URLs, and psychological urgency tactics.
+- Categorizes risk into `None`, `Low`, `Medium`, and `High` with explicit bulleted rationale before the user clicks any embedded links.
+
+### 🤖 Hybrid AI Summarizer & Smart Reply
+- **Executive Summaries**: Produces a synthesized briefing with key points, required actions, and deadlines.
+- **Dual-Engine Flexibility**: Connects to **Google Gemini 1.5 Flash** or **OpenAI GPT-4o-mini** when API keys are provided.
+- **Offline Fallback Guarantee**: If no API keys are present, MailMind automatically switches to a built-in rule-based heuristic extraction engine with zero external dependencies.
+- **Context-Aware Smart Replies**: Drafts professional, friendly, or decline responses ready for 1-click clipboard copying (never auto-sends without user confirmation).
+
+### 📊 Real-Time Analytics Dashboard
+- Interactive charts powered by **Recharts**:
+  - Email category distribution breakdown.
+  - Priority matrix visualizer.
+  - 7-day email volume and sync activity tracker.
+  - Career opportunity conversion pipeline.
+- All metrics are computed dynamically from database queries (zero hardcoded values).
 
 ---
 
-## Application Workflow
+## 🏗️ System Architecture
 
-```
-User Login (Google OAuth)
-        │
-        ▼
-Connect Gmail Account
-        │
-        ▼
-Sync Emails (Gmail API)
-        │
-        ▼
-For each email:
-  ├── ML Classification (LinearSVC)
-  ├── Priority Scoring
-  ├── Phishing Analysis
-  ├── Task Extraction (rule-based + optional LLM)
-  └── Opportunity Extraction (pattern matching)
-        │
-        ▼
-Store in PostgreSQL (per-user, isolated)
-        │
-        ▼
-Display in React Dashboard
-  ├── Inbox (classified, prioritized)
-  ├── Tasks & Deadlines
-  ├── Career Opportunities (with status tracking)
-  ├── Analytics (Recharts)
-  └── Settings
+```mermaid
+flowchart TD
+    subgraph Client["🖥️ Frontend (React 19 + TypeScript + Vite)"]
+        UI["Modern Dashboard UI\nTailwind CSS + Zustand"]
+        DOMP["DOMPurify HTML Sanitizer"]
+        RECH["Recharts Analytics"]
+    end
+
+    subgraph Server["⚡ Backend API (FastAPI + Async SQLAlchemy)"]
+        API["FastAPI REST Router\n(/api/v1)"]
+        Auth["OAuth 2.0 & JWT Security\nFernet Token Encryption"]
+        
+        subgraph Pipeline["Intelligence & ML Services"]
+            ML["LinearSVC + CalibratedClassifierCV\nTF-IDF N-Gram Vectorizer"]
+            PRIO["Multi-Signal Priority Scorer"]
+            PHISH["Phishing & Spoofing Analyzer"]
+            EXTRACT["Task & Opportunity Extractor"]
+            SUMM["Hybrid Summarizer\n(Gemini / OpenAI / Heuristic)"]
+        end
+    end
+
+    subgraph Storage["💾 Persistence Layer"]
+        DB[("Database\nSQLite (Dev) / PostgreSQL (Prod)\nAsync aiosqlite / asyncpg")]
+    end
+
+    subgraph External["🌐 External Cloud Services"]
+        GMAIL["Google Gmail API\n(OAuth 2.0 Scopes)"]
+        GEMINI["Google Gemini API\n(gemini-1.5-flash)"]
+    end
+
+    UI <-->|JSON / REST + JWT Cookie| API
+    API --> Auth
+    Auth <-->|Exchange Tokens| GMAIL
+    API --> Pipeline
+    Pipeline --> ML
+    Pipeline --> PRIO
+    Pipeline --> PHISH
+    Pipeline --> EXTRACT
+    Pipeline --> SUMM
+    SUMM -.->|Optional LLM| GEMINI
+    API <-->|Async ORM / Models| DB
 ```
 
 ---
 
-## ML Architecture
+## 🧠 Machine Learning Pipeline
 
-### Model Pipeline
 ```
-Email Text (subject + body)
-        │
-        ▼
-TF-IDF Vectorizer
+Raw Email Input (Subject + Body Text)
+                 │
+                 ▼
+       Text Preprocessing
+  - Whitespace & HTML entity cleanup
+  - Lowercase normalization
+                 │
+                 ▼
+       TF-IDF Vectorization
   - max_features: 10,000
-  - ngram_range: (1, 2)
-  - sublinear_tf: True
-        │
-        ▼
-LinearSVC (C=1.0, max_iter=2000)
-        │
-        ▼
-CalibratedClassifierCV (sigmoid, cv=3)
-        │
-        ▼
-Classification Result
-  - category: one of 9 normalized categories
-  - confidence: calibrated probability [0, 1]
-  - top_terms: top TF-IDF features (explanation)
-  - is_needs_review: confidence < threshold (0.45)
+  - ngram_range: (1, 2) [unigrams + bigrams]
+  - sublinear_tf: True (logarithmic scaling)
+                 │
+                 ▼
+       LinearSVC Classifier
+  - C: 1.0, max_iter: 2000
+                 │
+                 ▼
+    CalibratedClassifierCV
+  - Method: Sigmoid (Platt Scaling)
+  - Cross-validation: 3-fold stratified
+                 │
+                 ▼
+       Classification Output
+  - category: Argmax class label (1 of 9)
+  - confidence: Calibrated probability [0.0, 1.0]
+  - top_terms: Explanatory TF-IDF feature n-grams
+  - is_needs_review: True if confidence < 0.45
 ```
 
-### Categories
-| # | Category | Description |
-|---|----------|-------------|
-| 1 | Academic | Exams, results, curriculum, faculty |
-| 2 | Administration | Registrations, ID cards, official notices |
-| 3 | Campus Service | Library, hostel, cafeteria, facilities |
-| 4 | Career and Opportunity | Jobs, internships, placements, hackathons |
-| 5 | Financial Services | Fee payments, scholarships, stipends |
-| 6 | Service Notification | App alerts, portal updates, system emails |
-| 7 | Scholarship | Scholarship announcements and applications |
-| 8 | Skill Development | Courses, certifications, workshops |
-| 9 | Miscellaneous | Events, newsletters, general announcements |
+### Taxonomy & Categories
 
-> **Note**: LinearSVC does not natively produce calibrated probabilities. We use `CalibratedClassifierCV` with sigmoid calibration. Confidence scores are relative indicators, not guaranteed probabilities.
-
-### Training Data
-- Source: Synthetic + curated email dataset
-- Size: 450+ examples across 9 categories
-- Split: 70% train / 15% validation / 15% test (stratified)
-- Label normalization: whitespace stripped, casing normalized
+| # | Category | Scope & Examples |
+|---|:---|:---|
+| 1 | **Academic** | Course registration, lecture slides, syllabus updates, exam timetables, grade cards. |
+| 2 | **Administration** | University circulars, ID card issuance, fee compliance, hostel regulations, registrar notices. |
+| 3 | **Campus Service** | Library book returns, cafeteria schedules, sports complex booking, Wi-Fi maintenance. |
+| 4 | **Career and Opportunity** | Job postings, summer internships, campus placements, hackathons, coding contests. |
+| 5 | **Financial Services** | Bank alerts, tuition receipts, payment reminders, student loan updates, refund notices. |
+| 6 | **Scholarship** | Government bursaries, merit scholarships, fellowship grants, endowment applications. |
+| 7 | **Skill Development** | Technical workshops, bootcamps, guest lectures, certifications, seminar registrations. |
+| 8 | **Service Notification** | Password resets, 2FA codes, account verifications, cloud service quotas, subscriptions. |
+| 9 | **Miscellaneous** | Newsletters, club invitations, social events, surveys, general campus buzz. |
 
 ---
 
-## Database Schema
+## 💾 Database Schema & Data Models
 
-```
-users
-  id (UUID PK)
-  email (VARCHAR UNIQUE)
-  name, picture_url, google_id
-  is_active, gmail_connected
-  preferences (JSONB)
-  created_at, updated_at
+MailMind AI enforces strict multi-tenant data isolation. Every record is bound to a foreign key pointing to `users.id`.
 
-oauth_credentials
-  id (UUID PK)
-  user_id → users (CASCADE)
-  provider, encrypted_access_token, encrypted_refresh_token
-  token_expiry, scopes[]
+```mermaid
+erDiagram
+    USERS ||--o{ OAUTH_CREDENTIALS : "has"
+    USERS ||--o{ EMAILS : "owns"
+    USERS ||--o{ TASKS : "manages"
+    USERS ||--o{ OPPORTUNITIES : "tracks"
+    USERS ||--o{ SYNC_HISTORY : "logs"
+    USERS ||--o{ CLASSIFICATION_FEEDBACK : "submits"
+    EMAILS ||--o{ TASKS : "generates"
+    EMAILS ||--o{ OPPORTUNITIES : "extracts"
 
-emails
-  id (UUID PK)
-  user_id → users (CASCADE)
-  gmail_message_id (UNIQUE per user)
-  subject, sender_email, sender_name, recipients[]
-  snippet, body_text, body_html (sanitized)
-  received_at, is_read, is_important, is_spam
-  category, priority, classification_confidence
-  phishing_risk, phishing_reasons (JSON)
-  ai_summary, ai_summary_structured (JSON)
-  created_at, updated_at
+    USERS {
+        uuid id PK
+        string email UK
+        string name
+        string picture_url
+        string google_id UK
+        boolean is_active
+        boolean gmail_connected
+        json preferences
+        datetime created_at
+    }
 
-tasks
-  id (UUID PK)
-  user_id → users, email_id → emails
-  title, description, due_date, event_date
-  organization, priority, confidence
-  is_completed, is_date_uncertain
-  created_at, updated_at
+    OAUTH_CREDENTIALS {
+        uuid id PK
+        uuid user_id FK
+        string provider
+        text encrypted_access_token
+        text encrypted_refresh_token
+        datetime token_expiry
+        json scopes
+    }
 
-opportunities
-  id (UUID PK)
-  user_id → users, email_id → emails
-  title, company, role, opportunity_type
-  eligibility, skills_required[], location, work_mode
-  stipend, application_url, deadline
-  status (new/saved/applied/assessment/interview/rejected/offer)
-  notes, confidence
-  created_at, updated_at
+    EMAILS {
+        uuid id PK
+        uuid user_id FK
+        string gmail_message_id
+        string subject
+        string sender_email
+        string sender_name
+        json recipients
+        text snippet
+        text body_text
+        text body_html
+        string category
+        float classification_confidence
+        string priority
+        string phishing_risk
+        json phishing_reasons
+        text ai_summary
+        json ai_summary_structured
+        boolean is_read
+        boolean is_important
+        boolean is_spam
+        datetime received_at
+    }
 
-classification_feedback
-  id, user_id, email_id
-  original_category, corrected_category
-  created_at
+    TASKS {
+        uuid id PK
+        uuid user_id FK
+        uuid email_id FK
+        string title
+        text description
+        datetime due_date
+        string priority
+        boolean is_completed
+    }
 
-sync_history
-  id, user_id
-  sync_type, status, emails_fetched, errors
-  started_at, completed_at
+    OPPORTUNITIES {
+        uuid id PK
+        uuid user_id FK
+        uuid email_id FK
+        string title
+        string company
+        string role
+        string opportunity_type
+        string stipend
+        string application_url
+        datetime deadline
+        string status
+    }
 ```
 
 ---
 
-## API Documentation
+## 🔌 REST API Reference
 
-Base URL: `http://localhost:8000/api/v1`
+Interactive OpenAPI Swagger documentation is available at `http://localhost:8000/docs`.
 
-Interactive docs available at: `http://localhost:8000/docs` (Swagger UI)
-
-### Authentication
+### Authentication & User Account
 | Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/auth/google/authorize` | Get OAuth URL |
-| GET | `/auth/google/callback` | OAuth callback |
-| POST | `/auth/logout` | Sign out |
-| GET | `/auth/me` | Current user |
-| DELETE | `/auth/account` | Delete account |
+|:---|:---|:---|
+| `GET` | `/api/v1/auth/google/authorize` | Generates CSRF state and returns Google OAuth 2.0 authorization URL |
+| `GET` | `/api/v1/auth/google/callback` | Exchanges authorization code for tokens, encrypts credentials, creates session |
+| `POST` | `/api/v1/auth/dev-login` | 1-click developer & demo access as "Alex Morgan" with pre-seeded data |
+| `GET` | `/api/v1/auth/me` | Returns current authenticated user profile |
+| `POST` | `/api/v1/auth/logout` | Clears HTTP-only session cookies |
+| `DELETE` | `/api/v1/auth/account` | Permanently deletes account, revokes OAuth tokens, and purges all data |
 
-### Gmail
+### Gmail Integration & Sync
 | Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/gmail/connect` | Connect Gmail |
-| DELETE | `/gmail/disconnect` | Disconnect Gmail |
-| POST | `/gmail/sync` | Sync inbox |
-| GET | `/gmail/sync/status` | Sync status |
+|:---|:---|:---|
+| `POST` | `/api/v1/gmail/connect` | Initiates Gmail connection handshake |
+| `DELETE` | `/api/v1/gmail/disconnect` | Revokes Google access and disconnects mailbox |
+| `POST` | `/api/v1/gmail/sync` | Triggers background synchronization, ML classification, and entity extraction |
+| `GET` | `/api/v1/gmail/sync/status` | Returns latest synchronization progress and metrics |
 
-### Emails
+### Emails & Intelligence
 | Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/emails/` | List emails (paginated) |
-| GET | `/emails/{id}` | Email detail |
-| PATCH | `/emails/{id}/read` | Mark read |
-| PATCH | `/emails/{id}/important` | Toggle important |
-| PATCH | `/emails/{id}/spam` | Mark spam |
-| PATCH | `/emails/{id}/category` | Update category |
-| PATCH | `/emails/{id}/priority` | Update priority |
-| POST | `/emails/{id}/summarize` | Generate AI summary |
-| GET | `/emails/{id}/reply-suggestions` | Smart replies |
+|:---|:---|:---|
+| `GET` | `/api/v1/emails/` | Paginated email listing with category, priority, search, and status filters |
+| `GET` | `/api/v1/emails/{id}` | Detailed email payload with full body, AI briefing, tasks, and phishing audit |
+| `PATCH` | `/api/v1/emails/{id}/read` | Updates read/unread state and synchronizes with Gmail labels |
+| `PATCH` | `/api/v1/emails/{id}/important` | Toggles important flag |
+| `PATCH` | `/api/v1/emails/{id}/spam` | Marks email as spam |
+| `POST` | `/api/v1/emails/{id}/summarize` | Generates on-demand executive summary with key points and action items |
+| `POST` | `/api/v1/emails/{id}/reply` | Generates context-aware smart reply drafts across multiple tones |
+| `POST` | `/api/v1/emails/{id}/feedback` | Logs user category corrections for continuous ML model refinement |
 
-### Tasks
+### Career Opportunities & Tasks
 | Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/tasks/` | List tasks |
-| POST | `/tasks/` | Create task |
-| GET | `/tasks/{id}` | Task detail |
-| PATCH | `/tasks/{id}` | Update task |
-| DELETE | `/tasks/{id}` | Delete task |
-| PATCH | `/tasks/{id}/complete` | Toggle complete |
-
-### Opportunities
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/opportunities/` | List opportunities |
-| GET | `/opportunities/{id}` | Opportunity detail |
-| PATCH | `/opportunities/{id}/status` | Update status |
-| PATCH | `/opportunities/{id}/notes` | Update notes |
-| DELETE | `/opportunities/{id}` | Delete |
+|:---|:---|:---|
+| `GET` | `/api/v1/opportunities/` | Retrieves extracted student opportunities with filter support |
+| `PATCH` | `/api/v1/opportunities/{id}/status` | Updates opportunity status (`new`, `applied`, `interview`, `offer`, etc.) |
+| `GET` | `/api/v1/tasks/` | Retrieves all extracted and user-created tasks |
+| `POST` | `/api/v1/tasks/` | Creates a new standalone task |
+| `PATCH` | `/api/v1/tasks/{id}/complete` | Toggles task completion status |
 
 ### Analytics
 | Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/analytics/summary` | Dashboard metrics |
-| GET | `/analytics/category-distribution` | Category breakdown |
-| GET | `/analytics/priority-distribution` | Priority breakdown |
-| GET | `/analytics/weekly-activity` | 7-day email volume |
-| GET | `/analytics/opportunities-overview` | Opportunity funnel |
+|:---|:---|:---|
+| `GET` | `/api/v1/analytics/summary` | Top-level counts: total emails, unread count, opportunities, active tasks |
+| `GET` | `/api/v1/analytics/category-distribution`| Email distribution counts across all 9 categories |
+| `GET` | `/api/v1/analytics/priority-distribution`| Volume breakdown by Critical, High, Medium, Low |
+| `GET` | `/api/v1/analytics/weekly-activity` | 7-day chronological email ingestion history |
 
 ---
 
-## Installation & Quick Start
+## 💻 Technology Stack
+
+### Backend
+- **Language**: Python 3.12+ (compatible with Python 3.14)
+- **Framework**: [FastAPI](https://fastapi.tiangolo.com/) with asynchronous route handlers
+- **Server**: [Uvicorn](https://www.uvicorn.org/) (ASGI server)
+- **Database ORM**: [SQLAlchemy 2.0](https://www.sqlalchemy.org/) (Async Engine)
+- **Database Drivers**: `aiosqlite` (built-in local dev) & `asyncpg` (PostgreSQL production)
+- **Machine Learning**: `scikit-learn`, `joblib`, `numpy`, `scipy`
+- **Security & Crypto**: `cryptography` (Fernet symmetric encryption), `python-jose` (JWT), `passlib`
+- **External APIs**: `google-api-python-client`, `google-auth`, `google-generativeai`, `httpx`
+
+### Frontend
+- **Framework**: [React 19](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/)
+- **Bundler & Tooling**: [Vite](https://vite.dev/)
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/) with full Dark/Light theme support
+- **State Management**: [Zustand](https://github.com/pmndrs/zustand)
+- **Routing**: [React Router v7](https://reactrouter.com/)
+- **Data Visualization**: [Recharts](https://recharts.org/)
+- **Icons**: [Lucide React](https://lucide.dev/)
+- **HTML Sanitization**: [DOMPurify](https://github.com/cure53/DOMPurify)
+
+---
+
+## 🚀 Installation & Quick Start
 
 ### Option 1: One-Click Quick Start (Windows)
-
-We provide pre-configured launcher scripts:
+The easiest way to launch both frontend and backend simultaneously:
 
 1. Double-click **`start.bat`** (or right-click `start.ps1` → **Run with PowerShell**).
-2. Both the FastAPI backend (`http://localhost:8000`) and the Vite React frontend (`http://localhost:5173`) will launch in separate terminal windows.
-3. Open **[http://localhost:5173](http://localhost:5173)** in your browser.
-4. Click **"Explore with Demo Account"** to immediately explore the workspace without needing any API keys or Google Cloud setup!
+2. The launcher will automatically start:
+   - FastAPI Backend at **[http://localhost:8000](http://localhost:8000)**
+   - Vite React Frontend at **[http://localhost:5173](http://localhost:5173)**
+3. Open your browser to **[http://localhost:5173](http://localhost:5173)**.
+4. Click **"Explore with Demo Account"** for instant 1-click access with simulated email intelligence!
 
 ---
 
-### Option 2: Running Inside VS Code
-
-The repository includes ready-to-use `.vscode/tasks.json` configuration:
+### Option 2: VS Code Task Runner
+Pre-configured tasks are provided in `.vscode/tasks.json`:
 
 1. Open the project folder in VS Code (`File` → `Open Folder...`).
-2. Press **`Ctrl + Shift + P`** (or `F1`) to open the Command Palette.
-3. Type **`Tasks: Run Task`** and press Enter.
+2. Press `Ctrl + Shift + P` (or `Cmd + Shift + P` on macOS) to open the Command Palette.
+3. Type **`Tasks: Run Task`** and press `Enter`.
 4. Select **`Run MailMind AI (Both Servers)`**.
-5. Both servers will launch in parallel inside your VS Code terminal!
+5. Both servers run concurrently inside your integrated VS Code terminals.
 
 ---
 
 ### Option 3: Manual Terminal Setup
 
 #### Prerequisites
-- **Python 3.12+** (tested on Python 3.14)
-- **Node.js 20+** (tested on Node.js 24)
-- **SQLite** (built-in, zero setup) or **PostgreSQL 16+** (via Docker)
+- **Python 3.12+**
+- **Node.js 20+**
+- **Git**
 
 #### 1. Backend Setup
-```powershell
+```bash
+# Navigate to backend directory
 cd backend
 
-# (Optional) Create virtual environment
+# Create and activate virtual environment
 python -m venv .venv
-.venv\Scripts\activate       # Windows
-# source .venv/bin/activate  # macOS/Linux
+# On Windows:
+.venv\Scripts\activate
+# On macOS/Linux:
+source .venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Train the Calibrated ML Classifier Model (generates ml/artifacts/model_v1.pkl)
+# (Optional) Retrain the ML Classifier Model if needed
 python ml/train.py
 
-# Start FastAPI backend server
+# Launch FastAPI development server
 python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
-> Backend runs at `http://localhost:8000`. Swagger API docs: `http://localhost:8000/docs`.
+> The API will be active at `http://127.0.0.1:8000` with Swagger docs at `http://127.0.0.1:8000/docs`.
 
 #### 2. Frontend Setup
-```powershell
+```bash
+# In a new terminal, navigate to frontend directory
 cd frontend
 
 # Install npm dependencies
@@ -435,274 +431,165 @@ npm install
 # Start Vite development server
 npm run dev
 ```
-> Frontend runs at `http://localhost:5173`.
+> The frontend will be active at `http://localhost:5173`.
 
 ---
 
-## Google OAuth 2.0 Setup (Connecting Your Personal Gmail)
+## 🔑 Google OAuth 2.0 Configuration
 
-MailMind AI supports two login options:
-1. **Instant Demo Access**: 1-click login as "Alex Morgan" with pre-loaded mock student & career emails across all 9 categories.
-2. **Real Gmail Sync**: Connects to your live Gmail inbox via Google OAuth 2.0.
-
-To connect your real Gmail account:
+MailMind connects to your live mailbox using Google's official OAuth 2.0 API. To connect your personal Gmail account:
 
 1. Go to the **[Google Cloud Console](https://console.cloud.google.com/)**.
-2. Create a new project (e.g. `MailMind AI`).
-3. Enable the **Gmail API** in **APIs & Services → Library**.
+2. Create a new project (e.g. `MailMind-AI`).
+3. Navigate to **APIs & Services → Library**, search for **Gmail API**, and click **Enable**.
 4. Configure the **OAuth consent screen**:
-   * Choose **External** user type.
-   * Add scopes: `.../auth/userinfo.email`, `.../auth/userinfo.profile`, `openid`, `.../auth/gmail.readonly`, and `.../auth/gmail.modify`.
-   * Under **Test users**, click **`+ ADD USERS`** and add your personal Gmail address (e.g. `yourname@gmail.com`).
+   - User Type: **External**.
+   - App information: Name: `MailMind AI`, User support email: your email.
+   - Scopes: Add `.../auth/userinfo.email`, `.../auth/userinfo.profile`, `openid`, `.../auth/gmail.readonly`, and `.../auth/gmail.modify`.
+   - **Test Users**: Under Test users, click **`+ ADD USERS`** and add your personal Gmail address (e.g. `yourname@gmail.com`).
 5. Go to **APIs & Services → Credentials**:
-   * Click **`+ CREATE CREDENTIALS`** → **OAuth client ID**.
-   * Application type: **Web application**.
-   * Under **Authorized JavaScript origins**, add: `http://localhost:5173`.
-   * Under **Authorized redirect URIs**, add:
+   - Click **`+ CREATE CREDENTIALS`** → **OAuth client ID**.
+   - Application type: **Web application**.
+   - **Authorized JavaScript origins**:
+     ```text
+     http://localhost:5173
+     ```
+   - **Authorized redirect URIs**:
      ```text
      http://localhost:8000/api/v1/auth/google/callback
      ```
-6. Copy your **Client ID** and **Client Secret**, and paste them into `backend/.env`:
+6. Copy your **Client ID** and **Client Secret**, and paste them into your `.env` file:
    ```env
    GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
    GOOGLE_CLIENT_SECRET=your-client-secret
    ```
-7. When signing in, Google will show a standard *"Google hasn’t verified this app"* screen (normal for unverified personal dev apps). Click **`Continue`** to enter your dashboard!
+7. Sign in at `http://localhost:5173/login` using **"Continue with Google"**. On the Google unverified screen, click **Advanced** → **Go to MailMind AI (unsafe)** to enter your dashboard.
 
 ---
 
-## Environment Variables Reference
+## ⚙️ Environment Variables
 
-A `.env` file in `backend/` supports both development (SQLite) and production (PostgreSQL):
+Copy `.env.example` to `.env` in the project root:
 
-```env
-APP_ENV=development
-APP_NAME=MailMind AI
-APP_HOST=0.0.0.0
-APP_PORT=8000
-APP_DEBUG=true
-
-# Database (SQLite for zero-setup local dev; PostgreSQL for production/Docker)
-DATABASE_URL=sqlite+aiosqlite:///./mailmind.db
-# DATABASE_URL=postgresql+asyncpg://mailmind:mailmind_secret@localhost:5432/mailmind_db
-
-# Security & CORS
-CORS_ORIGINS=["http://localhost:5173", "http://localhost:3000"]
-APP_SECRET_KEY=mailmind-ai-secret-key-development-32-chars-minimum
-JWT_SECRET_KEY=mailmind-ai-jwt-secret-key-development-32-chars
-ML_MODEL_PATH=ml/artifacts/model_v1.pkl
-
-# Google OAuth 2.0 (Optional, required only for real Gmail sync)
-GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=your-google-client-secret
-GOOGLE_REDIRECT_URI=http://localhost:8000/api/v1/auth/google/callback
-
-# LLM Providers (Optional, heuristic fallbacks work 100% offline without API keys)
-AI_PROVIDER=gemini        # gemini | openai | (empty for heuristic fallback)
-GEMINI_API_KEY=
-OPENAI_API_KEY=
-```
+| Variable | Default Value | Description |
+|:---|:---|:---|
+| `APP_ENV` | `development` | Environment mode (`development` or `production`) |
+| `APP_NAME` | `MailMind AI` | Application title |
+| `APP_HOST` | `0.0.0.0` | API bind address |
+| `APP_PORT` | `8000` | API port |
+| `APP_DEBUG` | `true` | Enables detailed SQL logging and debug handlers |
+| `DATABASE_URL` | `sqlite+aiosqlite:///./mailmind.db` | Async database URL. Use `postgresql+asyncpg://...` for PostgreSQL |
+| `CORS_ORIGINS` | `["http://localhost:5173"]` | Authorized frontend origins |
+| `APP_SECRET_KEY` | *(32-char string)* | Core application key used for cryptographic derivation |
+| `JWT_SECRET_KEY` | *(32-char string)* | Secret key used to sign JWT session tokens |
+| `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | `60` | Lifespan of access tokens |
+| `ENCRYPTION_KEY` | *(Fernet key)* | Fernet key for encrypting OAuth tokens at rest |
+| `GOOGLE_CLIENT_ID` | `""` | Google Cloud OAuth 2.0 Web Client ID |
+| `GOOGLE_CLIENT_SECRET`| `""` | Google Cloud OAuth 2.0 Client Secret |
+| `GOOGLE_REDIRECT_URI` | `http://localhost:8000/api/v1/auth/google/callback` | OAuth redirect URI matching Google Console |
+| `AI_PROVIDER` | `gemini` | Summarizer provider: `gemini`, `openai`, or empty (heuristic) |
+| `GEMINI_API_KEY` | `""` | Optional Google AI Studio API key |
+| `OPENAI_API_KEY` | `""` | Optional OpenAI API key |
+| `ML_MODEL_PATH` | `ml/artifacts/model_v1.pkl` | Location of trained scikit-learn model bundle |
+| `ML_CONFIDENCE_THRESHOLD` | `0.45` | Minimum confidence required before triggering review flag |
 
 ---
 
-## Testing & Quality Assurance
+## 🧪 Testing & Quality Assurance
 
-### Automated Backend Tests
-Run the automated test suite covering API endpoints, ML classification, phishing detection, and priority scoring:
+MailMind AI includes automated test suites verifying critical business logic and system behavior:
 
-```powershell
+```bash
 cd backend
 python -m pytest tests/ -v
 ```
 
-**Verified Test Suite:**
-- `tests/test_api.py` — Health check, development bypass login, authentication enforcement.
-- `tests/test_classifier.py` — ML inference, confidence calibration, taxonomy classification.
-- `tests/test_phishing.py` — Spoofed domain detection, credential harvesting alert, legitimate email pass-through.
-- `tests/test_priority.py` — Urgent keyword scoring, newsletter deprioritization.
-
-### Frontend Production Build
-```powershell
-cd frontend
-npm run build
-```
-Compiles TypeScript and bundles via Vite with zero type errors.
-
----
-
-## Application Pages & Modules
-
-| Route | Page | Key Capabilities |
-|---|---|---|
-| `/login` | **Login & Landing** | Google OAuth 2.0 sign-in and 1-click Instant Demo Access. |
-| `/dashboard` | **Overview Dashboard** | KPI metrics, quick sync, recent priority inbox inflow, deadline reminders, career highlights. |
-| `/inbox` | **Inbox & Client** | Search with debounce, category & priority filtering, split view, phishing alert breakdown, AI summarization, suggested replies. |
-| `/important` | **Important Inflow** | Dedicated feed for critical & high priority messages and deadlines. |
-| `/categories` | **Category Taxonomy** | Explore emails classified into the 9 machine learning domains with real-time volume counts. |
-| `/tasks` | **Tasks & Deadlines** | Action items extracted from emails with due-date warnings, priority badges, and toggle completion. |
-| `/opportunities` | **Career Intelligence** | Student & Career pipeline tracking internships, placements, scholarships, and hackathons with status progression. |
-| `/analytics` | **Analytics & Telemetry** | Interactive Recharts visualizations for category distribution, priority breakdown, and 7-day email volume. |
-| `/settings` | **Settings & Security** | Gmail connection status, Fernet token encryption details, and Dark/Light theme mode. |
+### Verified Test Suites
+- **`tests/test_classifier.py`**:
+  - Model bundle loading and deserialization.
+  - Multi-class email prediction and confidence boundary checks ($0.0 \le c \le 1.0$).
+  - Semantic scholarship and career classification assertions.
+- **`tests/test_priority.py`**:
+  - Critical priority calculation on urgent administrative deadlines.
+  - Low priority classification for promotional newsletters and digests.
+- **`tests/test_phishing.py`**:
+  - Detection of spoofed display names with domain mismatches.
+  - Legitimate academic email pass-through without false positives.
+- **`tests/test_api.py`**:
+  - Server health endpoint response validation.
+  - Development mock login token generation.
+  - Authentication guard enforcement on protected routes (HTTP 401).
 
 ---
 
-## Testing
+## 🔒 Security & Privacy Blueprint
 
-### Backend Tests
-```bash
-cd backend
+- **Zero Password Storage**: Uses standard Google OAuth 2.0 tokens; user passwords never touch the server.
+- **Token Encryption at Rest**: Access and Refresh tokens are encrypted using **Fernet symmetric encryption** (`cryptography` library) before database insertion.
+- **Multi-Tenant Row-Level Isolation**: Every SQL query filters strictly by `user_id == current_user.id`. IDOR-proof by design.
+- **Strict HTML Sanitization**: Email HTML bodies are sanitized via **DOMPurify** with strict element and attribute allowlists, stripping `script`, `iframe`, and malicious tracking payloads.
+- **Defensive API Architecture**: Rate limiting, strict CORS origin controls, and HTTP-only SameSite cookies protect against CSRF and session hijacking.
 
-# All tests
-pytest tests/ -v
+---
 
-# With coverage
-pytest tests/ -v --cov=app --cov-report=html
+## 📁 Project Directory Structure
 
-# Specific test file
-pytest tests/test_auth.py -v
-```
-
-### ML Evaluation
-```bash
-cd backend
-
-# Train model
-python ml/train.py
-
-# Run evaluation (reports actual metrics)
-python ml/evaluate.py
-```
-
-### Frontend Tests
-```bash
-cd frontend
-
-# Run tests
-npm test
-
-# With UI
-npm run test:ui
-```
-
-### E2E Tests
-```bash
-cd e2e
-
-# Install Playwright
-npx playwright install
-
-# Run E2E tests (requires running frontend + backend)
-npx playwright test
-
-# View report
-npx playwright show-report
+```text
+Mailmind/
+├── .vscode/                   # VS Code launch & background tasks configuration
+│   ├── launch.json
+│   └── tasks.json
+├── backend/                   # FastAPI Python Application
+│   ├── app/
+│   │   ├── api/               # REST API route handlers
+│   │   │   ├── analytics.py
+│   │   │   ├── auth.py
+│   │   │   ├── emails.py
+│   │   │   ├── gmail.py
+│   │   │   ├── opportunities.py
+│   │   │   ├── settings.py
+│   │   │   └── tasks.py
+│   │   ├── core/              # Config, security, logging, OAuth
+│   │   ├── database/          # SQLAlchemy async connection & Base
+│   │   ├── models/            # Database entity models
+│   │   ├── schemas/           # Pydantic v2 schemas
+│   │   ├── services/          # Classifier, extraction, summarizer, phishing
+│   │   └── utils/
+│   ├── ml/                    # Machine learning pipeline
+│   │   ├── artifacts/         # Trained model bundle (model_v1.pkl)
+│   │   ├── data/              # Curated email dataset
+│   │   ├── predict.py         # Inference engine & explainability
+│   │   └── train.py           # Training script (TF-IDF + LinearSVC + CalibratedClassifierCV)
+│   ├── tests/                 # Automated pytest test suites
+│   ├── requirements.txt       # Python dependencies
+│   └── pytest.ini
+├── frontend/                  # React 19 + TypeScript + Vite Application
+│   ├── src/
+│   │   ├── components/        # UI components (emails, badges, modals, charts)
+│   │   ├── hooks/             # Custom React hooks (useAuth, useEmails)
+│   │   ├── pages/             # Route views (Inbox, Analytics, Opportunities, Tasks)
+│   │   ├── services/          # Axios API client
+│   │   ├── types/             # TypeScript type definitions
+│   │   └── utils/             # Sanitization, date formatting, helpers
+│   ├── package.json
+│   ├── tailwind.config.js
+│   └── vite.config.ts
+├── docker-compose.yml         # Containerized production stack (PostgreSQL + API + Web)
+├── start.bat                  # 1-Click Windows Batch launcher
+├── start.ps1                  # 1-Click Windows PowerShell launcher
+├── .env                       # Environment variables configuration
+└── README.md                  # Project documentation
 ```
 
 ---
 
-## Deployment
+## 📄 License & Contributing
 
-### Production Docker
+Distributed under the **MIT License**. See `LICENSE` for more information.
 
-```bash
-# Build production images
-docker build ./backend --target production -t mailmind-backend:latest
-docker build ./frontend --target production -t mailmind-frontend:latest
+Contributions, issues, and feature requests are welcome!
+Feel free to open an issue or submit a Pull Request.
 
-# Update docker-compose for production
-# Set APP_ENV=production, CORS_ORIGINS, DATABASE_URL, etc.
-docker compose -f docker-compose.yml up -d
-```
-
-### Environment for Production
-```env
-APP_ENV=production
-APP_DEBUG=false
-SESSION_COOKIE_SECURE=true
-CORS_ORIGINS=https://yourdomain.com
-DATABASE_URL=postgresql+asyncpg://user:pass@db-host:5432/mailmind_prod
-GOOGLE_REDIRECT_URI=https://api.yourdomain.com/api/v1/auth/google/callback
-```
-
-### Database Migrations (Production)
-```bash
-# Apply all pending migrations
-alembic upgrade head
-
-# Check current state
-alembic current
-
-# Generate new migration after model changes
-alembic revision --autogenerate -m "describe_change"
-```
-
----
-
-## Security & Privacy
-
-- **No Gmail passwords stored** — Uses Google OAuth 2.0 exclusively
-- **Tokens encrypted at rest** — All OAuth tokens encrypted with Fernet before database storage
-- **User data isolation** — Every API endpoint validates ownership (IDOR prevention)
-- **HTML sanitization** — Email HTML rendered through DOMPurify allowlist
-- **CSRF protection** — State parameter in OAuth flow
-- **Restricted scopes** — Only `gmail.readonly` and `gmail.modify` requested
-- **No token logging** — Access/refresh tokens never written to logs
-- **SQL injection prevention** — SQLAlchemy parameterized queries throughout
-- **CORS configured** — Restricted to configured origins in production
-
-**Data retained:**
-- Email metadata (subject, sender, snippet)
-- Email body (stored for classification — text and sanitized HTML)
-- Classification results and AI summaries
-- Extracted tasks and opportunities
-
-**Data NOT stored:**
-- Gmail password or App Passwords
-- Raw email attachments
-- Full attachment content
-
----
-
-## Known Limitations
-
-1. **Gmail API rate limits**: Sync is limited to 50 emails per request (configurable). Heavy users may hit quota limits.
-2. **ML model accuracy**: The LinearSVC model is trained on a synthetic dataset. Real-world accuracy improves with user corrections via the feedback system.
-3. **LLM API required for AI features**: Summarization, smart replies, and enhanced extraction require a Gemini or OpenAI API key.
-4. **Google OAuth verification**: Production distribution with Gmail scopes requires Google's OAuth consent screen verification for unrestricted user count.
-5. **No real-time push**: Email sync is pull-based (triggered manually or on page load). Real-time push would require Gmail Push Notifications (Pub/Sub).
-6. **Attachment handling**: Attachments are detected but not downloaded or processed.
-
----
-
-## Future Improvements
-
-- [ ] Gmail Push Notifications for real-time inbox updates
-- [ ] Semantic search using text embeddings
-- [ ] Model retraining pipeline using user feedback data
-- [ ] Google Calendar integration for confirmed event creation
-- [ ] Gmail send integration (after thorough OAuth safety review)
-- [ ] Team/shared inbox support
-- [ ] Export: tasks to CSV, opportunities to spreadsheet
-- [ ] Mobile app (React Native)
-- [ ] Webhook support for external task managers (Notion, Jira, Linear)
-- [ ] Email thread analysis and conversation summaries
-
----
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
-
----
-
-## License
-
-See [LICENSE](LICENSE) for details.
-
----
-
-*Built with ❤️ as a serious software engineering portfolio project.*
-"# MailMind-AI" 
-#� �M�a�i�l�M�i�n�d�-�A�I�
-�
-�
+<p align="center">
+  Made with ❤️ by Sneha • Built with FastAPI, React 19 & Scikit-Learn
+</p>
