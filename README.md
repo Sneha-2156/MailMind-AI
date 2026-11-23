@@ -703,3 +703,5 @@ See [LICENSE](LICENSE) for details.
 
 *Built with ❤️ as a serious software engineering portfolio project.*
 "# MailMind-AI" 
+#   M a i l M i n d - A I  
+ 
