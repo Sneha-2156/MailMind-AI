@@ -3,8 +3,8 @@ FROM node:20-alpine AS development
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
-RUN npm ci
+COPY package.json package-lock.json* .npmrc* ./
+RUN npm ci --legacy-peer-deps
 
 COPY . .
 
