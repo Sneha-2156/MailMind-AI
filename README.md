@@ -1,9 +1,5 @@
 # 📬 MailMind AI
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/mail-check.svg" width="80" height="80" alt="MailMind AI Logo" />
-</p>
-
 <h3 align="center">Your inbox, intelligently understood.</h3>
 
 <p align="center">
