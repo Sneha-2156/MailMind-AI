@@ -24,7 +24,10 @@ ENV APP_ENV=production \
     PYTHONUNBUFFERED=1 \
     FORWARDED_ALLOW_IPS="*"
 
+# The trained model file is gitignored, so build it into the image (a few seconds on this dataset)
+RUN mkdir -p ml/artifacts && python ml/train.py
+
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-CMD ["sh", "-c", "alembic upgrade head || true && uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers"]
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers"]

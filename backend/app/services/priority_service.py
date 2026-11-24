@@ -1,6 +1,7 @@
 """Smart email priority detection service."""
 
 from dataclasses import dataclass, field
+import re
 from typing import Any
 
 URGENT_KEYWORDS = [
@@ -43,6 +44,22 @@ PROMOTIONAL_KEYWORDS = [
 ]
 
 
+# Marketing markers that, when in the subject, mean "promo" (checked before urgency)
+PROMO_SUBJECT_KEYWORDS = [
+    "newsletter",
+    "discount",
+    "sale",
+    "special offer",
+    "buy now",
+    "promotional",
+]
+
+
+def _has(text: str, keyword: str) -> bool:
+    """Whole-word match (plural 's' allowed), so 'example' does not contain 'exam'."""
+    return re.search(rf"(?<!\w){re.escape(keyword)}s?(?!\w)", text) is not None
+
+
 @dataclass
 class PriorityResult:
     """Result of email priority scoring."""
@@ -65,9 +82,19 @@ def score_priority(email_data: dict[str, Any]) -> PriorityResult:
 
     signals = []
 
+    # 0. Promotional subject (e.g. "Flash sale expires tonight") is low, not critical,
+    #    unless the subject also carries a real career/academic keyword
+    promo_kw = next((kw for kw in PROMO_SUBJECT_KEYWORDS if _has(subject, kw)), None)
+    if promo_kw and not any(_has(subject, kw) for kw in IMPORTANT_KEYWORDS):
+        return PriorityResult(
+            priority="low",
+            reason="Marketing or promotional email indicators",
+            signals=[f"Promotional marker in subject: '{promo_kw}'"],
+        )
+
     # 1. Critical signals
     for kw in URGENT_KEYWORDS:
-        if kw in subject:
+        if _has(subject, kw):
             signals.append(f"Subject contains urgent keyword: '{kw}'")
             return PriorityResult(
                 priority="critical",
@@ -77,17 +104,17 @@ def score_priority(email_data: dict[str, Any]) -> PriorityResult:
 
     # 2. High priority signals
     for kw in IMPORTANT_KEYWORDS:
-        if kw in subject or kw in body[:300]:
+        if _has(subject, kw) or _has(body[:300], kw):
             signals.append(f"Important keyword found: '{kw}'")
 
     if category in ["Career and Opportunity", "Scholarship"]:
         signals.append(f"Category '{category}' is prioritized")
 
-    if "exam" in subject or "admit card" in subject or "deadline" in body:
+    if _has(subject, "exam") or _has(subject, "admit card") or _has(body, "deadline"):
         signals.append("Academic or deadline notice detected")
 
     if len(signals) >= 1 and any(
-        kw in subject for kw in ["interview", "offer letter", "admit card", "selection"]
+        _has(subject, kw) for kw in ["interview", "offer letter", "admit card", "selection"]
     ):
         return PriorityResult(
             priority="high",
@@ -104,7 +131,7 @@ def score_priority(email_data: dict[str, Any]) -> PriorityResult:
 
     # 3. Low priority signals
     for kw in PROMOTIONAL_KEYWORDS:
-        if kw in subject or kw in body:
+        if _has(subject, kw) or _has(body, kw):
             signals.append(f"Promotional marker found: '{kw}'")
             return PriorityResult(
                 priority="low",

@@ -8,12 +8,14 @@ import logging
 from typing import Any, Optional
 import uuid
 
+from fastapi import HTTPException
 import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.core.security import decrypt_token
+from app.core.oauth import refresh_access_token
+from app.core.security import decrypt_token, encrypt_token
 from app.models.email import Email
 from app.models.oauth_credential import OAuthCredential
 from app.models.opportunity import Opportunity
@@ -27,6 +29,19 @@ from app.services.priority_service import score_priority
 from app.utils.email_parser import extract_header, get_body_parts, parse_recipients, parse_sender
 
 logger = logging.getLogger(__name__)
+
+TOKEN_REFRESH_MARGIN = timedelta(minutes=2)
+
+
+class GmailAuthError(Exception):
+    """Google rejected our credentials (expired or revoked): the user must reconnect Gmail."""
+
+
+class GmailAPIError(Exception):
+    """Gmail returned an unexpected, non-auth error."""
+
+
+RECONNECT_MESSAGE = "Your Gmail connection has expired. Please sign in with Google again."
 
 MOCK_SAMPLE_EMAILS = [
     {
@@ -175,30 +190,87 @@ class GmailService:
         self.user = user
         self.classifier = ClassifierService()
 
-    async def get_valid_access_token(self) -> Optional[str]:
-        """Retrieve and decrypt stored Google OAuth access token."""
+    async def _get_credential(self) -> Optional[OAuthCredential]:
         stmt = (
             select(OAuthCredential)
             .where(OAuthCredential.user_id == self.user.id)
             .where(OAuthCredential.provider == "google")
         )
-        res = await self.db.execute(stmt)
-        cred = res.scalar_one_or_none()
+        return (await self.db.execute(stmt)).scalar_one_or_none()
+
+    async def get_valid_access_token(self) -> Optional[str]:
+        """Return a usable Google access token, refreshing it first if it has expired.
+
+        Returns None when the user has no Google credentials (the demo account).
+        Raises GmailAuthError when the token cannot be refreshed (user must reconnect).
+        """
+        cred = await self._get_credential()
         if not cred or not cred.access_token:
             return None
-        return decrypt_token(cred.access_token)
 
-    async def sync_emails(self, max_results: int = 50) -> dict[str, Any]:
-        """Synchronize emails from Gmail API or populate demo data if credentials are not present."""
-        token = await self.get_valid_access_token()
+        now = datetime.now(timezone.utc)
+        expiry = cred.token_expiry
+        if expiry is not None and expiry.tzinfo is None:
+            expiry = expiry.replace(tzinfo=timezone.utc)  # SQLite drops tzinfo
 
-        if token:
-            try:
-                return await self._sync_real_gmail(token, max_results)
-            except Exception as e:
-                logger.warning("Real Gmail sync failed (%s), falling back to demo sync.", e)
+        if expiry is not None and expiry > now + TOKEN_REFRESH_MARGIN:
+            return decrypt_token(cred.access_token) or None
 
-        return await self._sync_mock_emails()
+        # Expired, expiring soon, or expiry unknown (rows saved before this fix): refresh.
+        refresh = decrypt_token(cred.refresh_token or "")
+        if not refresh:
+            if expiry is None:  # old row, nothing to refresh with: try the stored token
+                return decrypt_token(cred.access_token) or None
+            raise GmailAuthError("Access token expired and no refresh token is stored.")
+
+        try:
+            data = await refresh_access_token(refresh)
+        except HTTPException as exc:  # Google answered non-200 (e.g. invalid_grant)
+            raise GmailAuthError("Google refused the refresh token.") from exc
+
+        new_access = data.get("access_token")
+        if not new_access:
+            raise GmailAuthError("Google did not return a new access token.")
+
+        cred.access_token = encrypt_token(new_access)
+        if data.get("refresh_token"):  # Google only sometimes rotates it
+            cred.refresh_token = encrypt_token(data["refresh_token"])
+        cred.token_expiry = now + timedelta(seconds=int(data.get("expires_in", 3600)))
+        await self.db.commit()
+        return new_access
+
+    async def _token_or_none(self) -> Optional[str]:
+        """Best-effort token for optional Gmail label updates (never raises)."""
+        try:
+            return await self.get_valid_access_token()
+        except Exception as exc:
+            logger.warning("Could not get a Gmail token: %s", exc)
+            return None
+
+    async def sync_emails(self, max_results: Optional[int] = None) -> dict[str, Any]:
+        """Sync from Gmail. Demo data is seeded ONLY for accounts with no Gmail credentials.
+
+        A connected user whose sync fails gets a clear error, never fake emails.
+        """
+        try:
+            token = await self.get_valid_access_token()
+        except GmailAuthError as exc:
+            logger.warning("Gmail reconnect needed for user %s: %s", self.user.id, exc)
+            raise HTTPException(status_code=409, detail=RECONNECT_MESSAGE) from exc
+        except httpx.HTTPError as exc:
+            raise HTTPException(status_code=502, detail="Could not reach Google. Try again shortly.") from exc
+
+        if token is None:
+            return await self._sync_mock_emails()
+
+        limit = max_results or get_settings().GMAIL_MAX_EMAILS_PER_SYNC
+        try:
+            return await self._sync_real_gmail(token, limit)
+        except GmailAuthError as exc:
+            raise HTTPException(status_code=409, detail=RECONNECT_MESSAGE) from exc
+        except (GmailAPIError, httpx.HTTPError) as exc:
+            logger.error("Gmail sync failed: %s", exc)
+            raise HTTPException(status_code=502, detail="Gmail sync failed. Please try again.") from exc
 
     async def _sync_mock_emails(self) -> dict[str, Any]:
         """Generate and upsert realistic mock emails and opportunities for testing/demo."""
@@ -327,8 +399,10 @@ class GmailService:
 
         async with httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.get(url, headers=headers)
+            if resp.status_code == 401:
+                raise GmailAuthError("Gmail API rejected the access token.")
             if resp.status_code != 200:
-                raise Exception(f"Gmail API returned {resp.status_code}: {resp.text}")
+                raise GmailAPIError(f"Gmail API returned {resp.status_code}")
 
             msg_list = resp.json().get("messages", [])
             synced_count = 0
@@ -455,7 +529,7 @@ class GmailService:
         """Update read status in DB and Gmail API."""
         email_obj.is_read = is_read
         await self.db.commit()
-        token = await self.get_valid_access_token()
+        token = await self._token_or_none()
         if token and email_obj.gmail_message_id and not email_obj.gmail_message_id.startswith("mock-"):
             headers = {"Authorization": f"Bearer {token}"}
             body = {"removeLabelIds": ["UNREAD"]} if is_read else {"addLabelIds": ["UNREAD"]}
@@ -473,7 +547,7 @@ class GmailService:
         """Mark email as spam in DB and Gmail API."""
         email_obj.is_spam = True
         await self.db.commit()
-        token = await self.get_valid_access_token()
+        token = await self._token_or_none()
         if token and email_obj.gmail_message_id and not email_obj.gmail_message_id.startswith("mock-"):
             headers = {"Authorization": f"Bearer {token}"}
             body = {"addLabelIds": ["SPAM"], "removeLabelIds": ["INBOX"]}
@@ -488,18 +562,24 @@ class GmailService:
                 logger.warning("Failed to mark spam on Gmail: %s", e)
 
     async def trash_email(self, email_obj: Email) -> None:
-        """Move email to trash in DB and Gmail API."""
-        token = await self.get_valid_access_token()
-        if token and email_obj.gmail_message_id and not email_obj.gmail_message_id.startswith("mock-"):
-            headers = {"Authorization": f"Bearer {token}"}
+        """Move email to trash in Gmail first, then delete the local copy.
+
+        If Gmail fails we keep the local copy, otherwise the next sync would bring it back.
+        """
+        if not email_obj.gmail_message_id.startswith("mock-"):
+            token = await self._token_or_none()
+            if not token:
+                raise HTTPException(status_code=409, detail=RECONNECT_MESSAGE)
             try:
                 async with httpx.AsyncClient(timeout=5.0) as client:
-                    await client.post(
+                    resp = await client.post(
                         f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{email_obj.gmail_message_id}/trash",
-                        headers=headers,
+                        headers={"Authorization": f"Bearer {token}"},
                     )
-            except Exception as e:
-                logger.warning("Failed to trash on Gmail: %s", e)
+            except httpx.HTTPError as exc:
+                raise HTTPException(status_code=502, detail="Could not reach Gmail. The email was not deleted.") from exc
+            if resp.status_code != 200:
+                raise HTTPException(status_code=502, detail="Gmail could not move this email to Trash. It was not deleted.")
 
         await self.db.delete(email_obj)
         await self.db.commit()

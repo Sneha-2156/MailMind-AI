@@ -21,12 +21,13 @@ settings = get_settings()
 async def lifespan(app: FastAPI):
     """Application lifespan context manager for startup and shutdown hooks."""
     logger.info("Initializing MailMind AI application...")
-    # Initialize database tables
-    try:
-        await init_db()
-        logger.info("Database schema verified and initialized.")
-    except Exception as e:
-        logger.error("Failed to initialize database: %s", e)
+    # Create tables automatically only outside production; in production Alembic owns the schema.
+    if settings.APP_ENV.lower() != "production":
+        try:
+            await init_db()
+            logger.info("Database schema verified and initialized.")
+        except Exception as e:
+            logger.error("Failed to initialize database: %s", e)
 
     # Load ML Classifier Model Bundle
     try:
