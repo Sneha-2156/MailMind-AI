@@ -5,6 +5,8 @@ import { test, expect } from '@playwright/test'
  * Verifies authentication flows, API security boundaries, and responsive layout.
  */
 
+const API = 'http://127.0.0.1:8000'
+
 test.describe('Authentication Flow', () => {
   test('login page renders correctly', async ({ page }) => {
     await page.goto('/login')
@@ -25,14 +27,14 @@ test.describe('Authentication Flow', () => {
 
   test('demo login button navigates to dashboard', async ({ page }) => {
     await page.goto('/login')
-    const demoButton = page.getByRole('button', { name: /explore with demo account/i })
-    await expect(demoButton).toBeVisible()
+    await page.getByRole('button', { name: /explore with demo account/i }).click()
+    await expect(page).toHaveURL(/\/dashboard/)
   })
 })
 
 test.describe('Health Check', () => {
   test('backend health endpoint returns healthy status', async ({ request }) => {
-    const response = await request.get('http://localhost:8000/health')
+    const response = await request.get(`${API}/health`)
     expect(response.ok()).toBeTruthy()
     const body = await response.json()
     expect(['healthy', 'ok']).toContain(body.status)
@@ -42,17 +44,24 @@ test.describe('Health Check', () => {
 
 test.describe('API Security', () => {
   test('emails endpoint requires authentication', async ({ request }) => {
-    const response = await request.get('http://localhost:8000/api/v1/emails')
+    const response = await request.get(`${API}/api/v1/emails`)
     expect(response.status()).toBe(401)
   })
 
   test('tasks endpoint requires authentication', async ({ request }) => {
-    const response = await request.get('http://localhost:8000/api/v1/tasks')
+    const response = await request.get(`${API}/api/v1/tasks`)
     expect(response.status()).toBe(401)
   })
 
   test('analytics endpoint requires authentication', async ({ request }) => {
-    const response = await request.get('http://localhost:8000/api/v1/analytics/summary')
+    const response = await request.get(`${API}/api/v1/analytics/summary`)
+    expect(response.status()).toBe(401)
+  })
+
+  test('a tampered or fake token is rejected', async ({ request }) => {
+    const response = await request.get(`${API}/api/v1/emails`, {
+      headers: { Authorization: 'Bearer not.a.real.token' },
+    })
     expect(response.status()).toBe(401)
   })
 })

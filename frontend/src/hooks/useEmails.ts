@@ -67,6 +67,13 @@ export const useEmails = () => {
     }
   }, [filters.search, filters.category, filters.priority, filters.is_read, filters.is_important, filters.is_spam, filters.sort])
 
+  // Refetch when a Gmail sync (auto or manual) completes
+  useEffect(() => {
+    const onSynced = () => fetchEmails(1, false)
+    window.addEventListener('mailmind:emails-synced', onSynced)
+    return () => window.removeEventListener('mailmind:emails-synced', onSynced)
+  }, [fetchEmails])
+
   const loadMore = useCallback(() => {
     if (!isLoading && pagination.hasNext) {
       fetchEmails(pagination.page + 1, true)

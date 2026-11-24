@@ -1,7 +1,7 @@
 """Authentication API endpoints (Google OAuth 2.0 & Development Mock Login)."""
 
-from datetime import datetime, timedelta, timezone
 import uuid
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import RedirectResponse
 import httpx
@@ -56,7 +56,6 @@ async def google_auth_callback(
     token_data = await exchange_code_for_tokens(code)
     access_token = token_data.get("access_token")
     refresh_token = token_data.get("refresh_token")
-    token_expiry = datetime.now(timezone.utc) + timedelta(seconds=int(token_data.get("expires_in", 3600)))
 
     if not access_token:
         raise HTTPException(
@@ -109,6 +108,7 @@ async def google_auth_callback(
     )
     cred = (await db.execute(cred_stmt)).scalar_one_or_none()
 
+    token_expiry = datetime.now(timezone.utc) + timedelta(seconds=int(token_data.get("expires_in", 3600)))
     if not cred:
         cred = OAuthCredential(
             user_id=user.id,
@@ -122,6 +122,7 @@ async def google_auth_callback(
     else:
         cred.access_token = encrypt_token(access_token)
         cred.token_expiry = token_expiry
+        cred.scopes = settings.GOOGLE_SCOPES
         if refresh_token:
             cred.refresh_token = encrypt_token(refresh_token)
 

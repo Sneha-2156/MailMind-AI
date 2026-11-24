@@ -1,5 +1,6 @@
 """Gmail API service with real Google client integration and realistic mock sync fallback."""
 
+import asyncio
 import base64
 from datetime import datetime, timedelta, timezone
 import email
@@ -8,7 +9,6 @@ import logging
 from typing import Any, Optional
 import uuid
 
-from fastapi import HTTPException
 import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,18 +30,12 @@ from app.utils.email_parser import extract_header, get_body_parts, parse_recipie
 
 logger = logging.getLogger(__name__)
 
-TOKEN_REFRESH_MARGIN = timedelta(minutes=2)
+DEMO_EMAIL = "demo@mailmind.ai"
+GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me"
 
 
 class GmailAuthError(Exception):
-    """Google rejected our credentials (expired or revoked): the user must reconnect Gmail."""
-
-
-class GmailAPIError(Exception):
-    """Gmail returned an unexpected, non-auth error."""
-
-
-RECONNECT_MESSAGE = "Your Gmail connection has expired. Please sign in with Google again."
+    """Raised when Gmail access is missing, revoked or cannot be refreshed."""
 
 MOCK_SAMPLE_EMAILS = [
     {
@@ -198,79 +192,59 @@ class GmailService:
         )
         return (await self.db.execute(stmt)).scalar_one_or_none()
 
-    async def get_valid_access_token(self) -> Optional[str]:
-        """Return a usable Google access token, refreshing it first if it has expired.
+    async def get_valid_access_token(self, force_refresh: bool = False) -> Optional[str]:
+        """Return a usable Google access token, refreshing it when expired.
 
-        Returns None when the user has no Google credentials (the demo account).
-        Raises GmailAuthError when the token cannot be refreshed (user must reconnect).
+        Returns None if there is no credential or the refresh token was revoked.
         """
         cred = await self._get_credential()
         if not cred or not cred.access_token:
             return None
 
-        now = datetime.now(timezone.utc)
+        access = decrypt_token(cred.access_token)
         expiry = cred.token_expiry
         if expiry is not None and expiry.tzinfo is None:
-            expiry = expiry.replace(tzinfo=timezone.utc)  # SQLite drops tzinfo
+            expiry = expiry.replace(tzinfo=timezone.utc)
+        expired = expiry is not None and expiry <= datetime.now(timezone.utc) + timedelta(seconds=60)
 
-        if expiry is not None and expiry > now + TOKEN_REFRESH_MARGIN:
-            return decrypt_token(cred.access_token) or None
+        if access and not expired and not force_refresh:
+            return access
 
-        # Expired, expiring soon, or expiry unknown (rows saved before this fix): refresh.
         refresh = decrypt_token(cred.refresh_token or "")
         if not refresh:
-            if expiry is None:  # old row, nothing to refresh with: try the stored token
-                return decrypt_token(cred.access_token) or None
-            raise GmailAuthError("Access token expired and no refresh token is stored.")
+            return access or None
 
         try:
             data = await refresh_access_token(refresh)
-        except HTTPException as exc:  # Google answered non-200 (e.g. invalid_grant)
-            raise GmailAuthError("Google refused the refresh token.") from exc
+        except Exception as e:  # revoked / invalid_grant
+            logger.warning("Google token refresh failed for user %s: %s", self.user.id, e)
+            self.user.gmail_connected = False
+            await self.db.commit()
+            return None
 
         new_access = data.get("access_token")
         if not new_access:
-            raise GmailAuthError("Google did not return a new access token.")
-
+            return None
         cred.access_token = encrypt_token(new_access)
-        if data.get("refresh_token"):  # Google only sometimes rotates it
-            cred.refresh_token = encrypt_token(data["refresh_token"])
-        cred.token_expiry = now + timedelta(seconds=int(data.get("expires_in", 3600)))
+        cred.token_expiry = datetime.now(timezone.utc) + timedelta(seconds=int(data.get("expires_in", 3600)))
         await self.db.commit()
         return new_access
 
-    async def _token_or_none(self) -> Optional[str]:
-        """Best-effort token for optional Gmail label updates (never raises)."""
-        try:
-            return await self.get_valid_access_token()
-        except Exception as exc:
-            logger.warning("Could not get a Gmail token: %s", exc)
-            return None
+    async def sync_emails(
+        self, max_results: Optional[int] = None, history_days: Optional[int] = None
+    ) -> dict[str, Any]:
+        """Sync the user's real Gmail inbox (or demo data for the demo account only)."""
+        settings = get_settings()
+        max_results = max(1, min(max_results or settings.GMAIL_MAX_EMAILS_PER_SYNC, 200))
+        history_days = max(1, min(history_days or settings.GMAIL_SYNC_HISTORY_DAYS, 365))
 
-    async def sync_emails(self, max_results: Optional[int] = None) -> dict[str, Any]:
-        """Sync from Gmail. Demo data is seeded ONLY for accounts with no Gmail credentials.
-
-        A connected user whose sync fails gets a clear error, never fake emails.
-        """
-        try:
-            token = await self.get_valid_access_token()
-        except GmailAuthError as exc:
-            logger.warning("Gmail reconnect needed for user %s: %s", self.user.id, exc)
-            raise HTTPException(status_code=409, detail=RECONNECT_MESSAGE) from exc
-        except httpx.HTTPError as exc:
-            raise HTTPException(status_code=502, detail="Could not reach Google. Try again shortly.") from exc
-
-        if token is None:
+        if self.user.email == DEMO_EMAIL:
             return await self._sync_mock_emails()
 
-        limit = max_results or get_settings().GMAIL_MAX_EMAILS_PER_SYNC
-        try:
-            return await self._sync_real_gmail(token, limit)
-        except GmailAuthError as exc:
-            raise HTTPException(status_code=409, detail=RECONNECT_MESSAGE) from exc
-        except (GmailAPIError, httpx.HTTPError) as exc:
-            logger.error("Gmail sync failed: %s", exc)
-            raise HTTPException(status_code=502, detail="Gmail sync failed. Please try again.") from exc
+        token = await self.get_valid_access_token()
+        if not token:
+            raise GmailAuthError("Gmail access is missing or was revoked. Please sign in with Google again.")
+        return await self._sync_real_gmail(token, max_results, history_days)
 
     async def _sync_mock_emails(self) -> dict[str, Any]:
         """Generate and upsert realistic mock emails and opportunities for testing/demo."""
@@ -392,144 +366,209 @@ class GmailService:
             "new_count": new_count,
         }
 
-    async def _sync_real_gmail(self, token: str, max_results: int) -> dict[str, Any]:
-        """Fetch emails via Gmail REST API."""
-        headers = {"Authorization": f"Bearer {token}"}
-        url = f"https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults={max_results}"
-
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.get(url, headers=headers)
-            if resp.status_code == 401:
-                raise GmailAuthError("Gmail API rejected the access token.")
-            if resp.status_code != 200:
-                raise GmailAPIError(f"Gmail API returned {resp.status_code}")
-
-            msg_list = resp.json().get("messages", [])
-            synced_count = 0
-            new_count = 0
-
-            for m in msg_list:
-                msg_id = m["id"]
-                stmt = select(Email).where(Email.user_id == self.user.id, Email.gmail_message_id == msg_id)
-                existing = (await self.db.execute(stmt)).scalar_one_or_none()
-
-                if existing:
-                    synced_count += 1
-                    continue
-
-                # Fetch full message
-                detail_resp = await client.get(
-                    f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg_id}?format=full",
-                    headers=headers,
-                )
-                if detail_resp.status_code != 200:
-                    continue
-
-                msg_data = detail_resp.json()
-                payload = msg_data.get("payload", {}) or {}
-                raw_headers = payload.get("headers", []) or []
-                subject = extract_header(raw_headers, "subject") or "No Subject"
-                from_header = extract_header(raw_headers, "from") or ""
-                sender_name, sender_email = parse_sender(from_header)
-                recipients = parse_recipients(extract_header(raw_headers, "to"))
-                snippet = msg_data.get("snippet", "")
-                label_ids = msg_data.get("labelIds", [])
-                bodies = get_body_parts(payload)
-                body_text = bodies.get("plain") or snippet
-                body_html = bodies.get("html") or ""
-                internal = msg_data.get("internalDate")
-                received_at = (
-                    datetime.fromtimestamp(int(internal) / 1000, tz=timezone.utc)
-                    if internal
-                    else datetime.now(timezone.utc)
-                )
-                # Classification and scoring
-                class_res = self.classifier.classify(f"{subject}\n{body_text}")
-                p_res = score_priority({
-                    "subject": subject,
-                    "body_text": body_text,
-                    "sender_email": sender_email or from_header,
-                    "category": class_res.category,
-                })
-                phish_res = analyze_phishing({
-                    "subject": subject,
-                    "body_text": body_text,
-                    "sender_email": sender_email or from_header,
-                    "sender_name": sender_name,
-                })
-
-                email_obj = Email(
-                    id=uuid.uuid4(),
-                    user_id=self.user.id,
-                    gmail_message_id=msg_id,
-                    gmail_thread_id=msg_data.get("threadId"),
-                    subject=subject,
-                    sender_email=sender_email or from_header,
-                    sender_name=sender_name or sender_email or from_header,
-                    recipients=recipients,
-                    snippet=snippet,
-                    body_text=body_text,
-                    body_html=body_html or f"<p>{snippet}</p>",
-                    received_at=received_at,
-                    is_read="UNREAD" not in label_ids,
-                    is_important="IMPORTANT" in label_ids or "STARRED" in label_ids,
-                    is_spam="SPAM" in label_ids or phish_res.risk_level == "high",
-                    category=class_res.category,
-                    priority=p_res.priority,
-                    classification_confidence=class_res.confidence,
-                    phishing_risk=phish_res.risk_level,
-                    phishing_reasons=phish_res.reasons,
-                )
-                self.db.add(email_obj)
-                await self.db.flush()
-
-                # Extract tasks and opportunities
-                tasks_data = ExtractionService.extract_tasks(subject, body_text, email_obj.priority)
-                for t in tasks_data:
-                    self.db.add(Task(
-                        user_id=self.user.id,
-                        email_id=email_obj.id,
-                        title=t["title"],
-                        description=t["description"],
-                        due_date=t["due_date"],
-                        priority=t["priority"],
-                        confidence=t["confidence"],
-                    ))
-
-                opp_data = ExtractionService.extract_opportunity(subject, body_text, class_res.category)
-                if opp_data:
-                    self.db.add(Opportunity(
-                        user_id=self.user.id,
-                        email_id=email_obj.id,
-                        title=opp_data["title"],
-                        company=opp_data["company"],
-                        role=opp_data["role"],
-                        opportunity_type=opp_data["opportunity_type"],
-                        eligibility=opp_data["eligibility"],
-                        skills_required=opp_data["skills_required"],
-                        stipend=opp_data.get("stipend"),
-                        application_url=opp_data.get("application_url"),
-                        deadline=opp_data.get("deadline"),
-                        status="new",
-                        confidence=opp_data["confidence"],
-                    ))
-
-                new_count += 1
-                synced_count += 1
-
-            await self.db.commit()
-            return {
-                "status": "success",
-                "mode": "live_gmail",
-                "synced_count": synced_count,
-                "new_count": new_count,
+    async def _list_message_ids(
+        self, client: httpx.AsyncClient, token: str, max_results: int, history_days: int
+    ) -> tuple[list[str], str]:
+        """List inbox message ids (newest first) with pagination. May refresh token once on 401."""
+        ids: list[str] = []
+        page_token: Optional[str] = None
+        retried = False
+        while len(ids) < max_results:
+            params: dict[str, Any] = {
+                "maxResults": min(100, max_results - len(ids)),
+                "labelIds": "INBOX",
+                "q": f"newer_than:{history_days}d",
             }
+            if page_token:
+                params["pageToken"] = page_token
+            resp = await client.get(
+                f"{GMAIL_API}/messages", headers={"Authorization": f"Bearer {token}"}, params=params
+            )
+            if resp.status_code == 401 and not retried:
+                retried = True
+                fresh = await self.get_valid_access_token(force_refresh=True)
+                if not fresh:
+                    raise GmailAuthError("Google session expired. Please sign in with Google again.")
+                token = fresh
+                continue
+            if resp.status_code in (401, 403):
+                raise GmailAuthError("Google denied access to Gmail. Please sign in again and allow Gmail access.")
+            if resp.status_code != 200:
+                raise RuntimeError(f"Gmail API returned {resp.status_code}: {resp.text[:200]}")
+            data = resp.json()
+            ids.extend(m["id"] for m in data.get("messages", []))
+            page_token = data.get("nextPageToken")
+            if not page_token:
+                break
+        return ids[:max_results], token
+
+    async def _sync_real_gmail(self, token: str, max_results: int, history_days: int) -> dict[str, Any]:
+        """Fetch the user's inbox via the Gmail REST API and classify new messages."""
+        history = SyncHistory(user_id=self.user.id, sync_type="gmail", status="running")
+        self.db.add(history)
+        await self.db.flush()
+
+        failed = 0
+        new_count = 0
+        try:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                ids, token = await self._list_message_ids(client, token, max_results, history_days)
+
+                existing: set[str] = set()
+                if ids:
+                    rows = await self.db.execute(
+                        select(Email.gmail_message_id).where(
+                            Email.user_id == self.user.id, Email.gmail_message_id.in_(ids)
+                        )
+                    )
+                    existing = set(rows.scalars().all())
+                new_ids = [i for i in ids if i not in existing]
+
+                sem = asyncio.Semaphore(8)
+                headers = {"Authorization": f"Bearer {token}"}
+
+                async def fetch(mid: str) -> Optional[dict[str, Any]]:
+                    async with sem:
+                        r = await client.get(f"{GMAIL_API}/messages/{mid}?format=full", headers=headers)
+                        return r.json() if r.status_code == 200 else None
+
+                fetched = await asyncio.gather(*(fetch(i) for i in new_ids), return_exceptions=True)
+
+            for msg_data in fetched:
+                if not isinstance(msg_data, dict):
+                    failed += 1
+                    continue
+                try:
+                    async with self.db.begin_nested():
+                        await self._ingest_message(msg_data)
+                    new_count += 1
+                except Exception as e:
+                    failed += 1
+                    logger.warning("Skipping Gmail message %s: %s", msg_data.get("id"), e)
+
+            history.status = "success" if failed == 0 else "partial"
+            history.emails_fetched = len(ids)
+            history.emails_classified = new_count
+            history.errors = f"{failed} message(s) skipped" if failed else None
+            history.completed_at = datetime.now(timezone.utc)
+            self.user.gmail_connected = True
+            await self.db.commit()
+        except GmailAuthError:
+            history.status = "failed"
+            history.errors = "auth"
+            history.completed_at = datetime.now(timezone.utc)
+            await self.db.commit()
+            raise
+        except Exception as e:
+            history.status = "failed"
+            history.errors = str(e)[:500]
+            history.completed_at = datetime.now(timezone.utc)
+            await self.db.commit()
+            raise
+
+        return {
+            "status": "success",
+            "mode": "live_gmail",
+            "message": f"Synced {new_count} new emails from Gmail.",
+            "synced_count": len(ids),
+            "new_count": new_count,
+            "failed_count": failed,
+        }
+
+    async def _ingest_message(self, msg_data: dict[str, Any]) -> None:
+        """Parse one Gmail message, classify it and extract tasks/opportunities."""
+        msg_id = msg_data["id"]
+        payload = msg_data.get("payload", {}) or {}
+        raw_headers = payload.get("headers", []) or []
+        subject = (extract_header(raw_headers, "subject") or "No Subject")[:1000]
+        from_header = extract_header(raw_headers, "from") or ""
+        sender_name, sender_email = parse_sender(from_header)
+        recipients = parse_recipients(extract_header(raw_headers, "to"))
+        snippet = msg_data.get("snippet", "")
+        label_ids = msg_data.get("labelIds", [])
+        bodies = get_body_parts(payload)
+        body_text = bodies.get("plain") or snippet
+        body_html = bodies.get("html") or ""
+        internal = msg_data.get("internalDate")
+        received_at = (
+            datetime.fromtimestamp(int(internal) / 1000, tz=timezone.utc)
+            if internal
+            else datetime.now(timezone.utc)
+        )
+
+        class_res = self.classifier.classify(f"{subject}\n{body_text}")
+        p_res = score_priority({
+            "subject": subject,
+            "body_text": body_text,
+            "sender_email": sender_email or from_header,
+            "category": class_res.category,
+        })
+        phish_res = analyze_phishing({
+            "subject": subject,
+            "body_text": body_text,
+            "sender_email": sender_email or from_header,
+            "sender_name": sender_name,
+        })
+
+        email_obj = Email(
+            id=uuid.uuid4(),
+            user_id=self.user.id,
+            gmail_message_id=msg_id,
+            gmail_thread_id=msg_data.get("threadId"),
+            subject=subject,
+            sender_email=(sender_email or from_header)[:320],
+            sender_name=(sender_name or sender_email or from_header)[:255],
+            recipients=recipients,
+            snippet=snippet,
+            body_text=body_text,
+            body_html=body_html or f"<p>{snippet}</p>",
+            received_at=received_at,
+            is_read="UNREAD" not in label_ids,
+            is_important="IMPORTANT" in label_ids or "STARRED" in label_ids,
+            is_spam="SPAM" in label_ids or phish_res.risk_level == "high",
+            category=class_res.category,
+            priority=p_res.priority,
+            classification_confidence=class_res.confidence,
+            phishing_risk=phish_res.risk_level,
+            phishing_reasons=phish_res.reasons,
+        )
+        self.db.add(email_obj)
+        await self.db.flush()
+
+        for t in ExtractionService.extract_tasks(subject, body_text, email_obj.priority):
+            self.db.add(Task(
+                user_id=self.user.id,
+                email_id=email_obj.id,
+                title=t["title"],
+                description=t["description"],
+                due_date=t["due_date"],
+                priority=t["priority"],
+                confidence=t["confidence"],
+            ))
+
+        opp_data = ExtractionService.extract_opportunity(subject, body_text, class_res.category)
+        if opp_data:
+            self.db.add(Opportunity(
+                user_id=self.user.id,
+                email_id=email_obj.id,
+                title=opp_data["title"],
+                company=opp_data["company"],
+                role=opp_data["role"],
+                opportunity_type=opp_data["opportunity_type"],
+                eligibility=opp_data["eligibility"],
+                skills_required=opp_data["skills_required"],
+                stipend=opp_data.get("stipend"),
+                application_url=opp_data.get("application_url"),
+                deadline=opp_data.get("deadline"),
+                status="new",
+                confidence=opp_data["confidence"],
+            ))
 
     async def mark_read(self, email_obj: Email, is_read: bool = True) -> None:
         """Update read status in DB and Gmail API."""
         email_obj.is_read = is_read
         await self.db.commit()
-        token = await self._token_or_none()
+        token = await self.get_valid_access_token()
         if token and email_obj.gmail_message_id and not email_obj.gmail_message_id.startswith("mock-"):
             headers = {"Authorization": f"Bearer {token}"}
             body = {"removeLabelIds": ["UNREAD"]} if is_read else {"addLabelIds": ["UNREAD"]}
@@ -547,7 +586,7 @@ class GmailService:
         """Mark email as spam in DB and Gmail API."""
         email_obj.is_spam = True
         await self.db.commit()
-        token = await self._token_or_none()
+        token = await self.get_valid_access_token()
         if token and email_obj.gmail_message_id and not email_obj.gmail_message_id.startswith("mock-"):
             headers = {"Authorization": f"Bearer {token}"}
             body = {"addLabelIds": ["SPAM"], "removeLabelIds": ["INBOX"]}
@@ -562,24 +601,18 @@ class GmailService:
                 logger.warning("Failed to mark spam on Gmail: %s", e)
 
     async def trash_email(self, email_obj: Email) -> None:
-        """Move email to trash in Gmail first, then delete the local copy.
-
-        If Gmail fails we keep the local copy, otherwise the next sync would bring it back.
-        """
-        if not email_obj.gmail_message_id.startswith("mock-"):
-            token = await self._token_or_none()
-            if not token:
-                raise HTTPException(status_code=409, detail=RECONNECT_MESSAGE)
+        """Move email to trash in DB and Gmail API."""
+        token = await self.get_valid_access_token()
+        if token and email_obj.gmail_message_id and not email_obj.gmail_message_id.startswith("mock-"):
+            headers = {"Authorization": f"Bearer {token}"}
             try:
                 async with httpx.AsyncClient(timeout=5.0) as client:
-                    resp = await client.post(
+                    await client.post(
                         f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{email_obj.gmail_message_id}/trash",
-                        headers={"Authorization": f"Bearer {token}"},
+                        headers=headers,
                     )
-            except httpx.HTTPError as exc:
-                raise HTTPException(status_code=502, detail="Could not reach Gmail. The email was not deleted.") from exc
-            if resp.status_code != 200:
-                raise HTTPException(status_code=502, detail="Gmail could not move this email to Trash. It was not deleted.")
+            except Exception as e:
+                logger.warning("Failed to trash on Gmail: %s", e)
 
         await self.db.delete(email_obj)
         await self.db.commit()

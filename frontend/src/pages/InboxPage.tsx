@@ -74,8 +74,8 @@ export const InboxPage: React.FC = () => {
       const res = await gmailApi.syncEmails()
       toast.success(`Sync complete: ${res.data.synced_count || 0} emails processed!`)
       fetchEmails(1)
-    } catch {
-      toast.error('Sync failed. Please check connection.')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || 'Sync failed. Please check connection.')
     } finally {
       setSyncing(false)
     }

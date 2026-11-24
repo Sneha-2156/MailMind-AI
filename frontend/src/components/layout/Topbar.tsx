@@ -37,9 +37,9 @@ export const Topbar: React.FC<TopbarProps> = ({ onOpenMobileSidebar }) => {
     try {
       const res = await gmailApi.syncEmails({ max_emails: 50, history_days: 30 })
       toast.success(res.data?.message || 'Sync completed successfully')
-    } catch {
-      // Graceful notification
-      toast.info('Synchronization requested')
+      window.dispatchEvent(new Event('mailmind:emails-synced'))
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || 'Sync failed. Please try again.')
     } finally {
       setTimeout(() => setSyncing(false), 800)
     }

@@ -4,10 +4,14 @@ import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
 import { ToastContainer } from '@/components/ui/Toast'
 import { useEmailStore } from '@/stores/emailStore'
+import { useGmailAutoSync } from '@/hooks/useGmailAutoSync'
+import { Spinner } from '@/components/ui/Spinner'
 
 export const Layout: React.FC = () => {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const { emails } = useEmailStore()
+
+  const { isInitialSync } = useGmailAutoSync()
 
   const unreadCount = emails.filter((e) => !e.is_read).length
 
@@ -30,7 +34,19 @@ export const Layout: React.FC = () => {
 
         {/* Dynamic Route Pages */}
         <main className="flex-1 overflow-x-hidden">
-          <Outlet />
+          {isInitialSync ? (
+            <div className="h-[calc(100vh-4rem)] flex flex-col items-center justify-center gap-3 text-center px-6">
+              <Spinner size="lg" />
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                Importing your Gmail inbox…
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Classifying emails and extracting tasks. This takes a few seconds the first time.
+              </p>
+            </div>
+          ) : (
+            <Outlet />
+          )}
         </main>
       </div>
     </div>

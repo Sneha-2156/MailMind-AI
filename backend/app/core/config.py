@@ -1,8 +1,8 @@
 """Application settings and configuration management."""
 
 from functools import lru_cache
-from typing import Union
-from pydantic import field_validator
+from typing import Any, Union
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -53,10 +53,32 @@ class Settings(BaseSettings):
     GMAIL_SYNC_HISTORY_DAYS: int = 30
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(".env", "../.env", "backend/.env"),
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def strip_inline_comments(cls, values: Any) -> Any:
+        """Strip trailing unquoted inline comments (e.g. `value # comment`) from env vars."""
+        if isinstance(values, dict):
+            clean = {}
+            for k, v in values.items():
+                if isinstance(v, str):
+                    v_t = v.strip()
+                    if (v_t.startswith('"') and v_t.endswith('"')) or (v_t.startswith("'") and v_t.endswith("'")):
+                        clean[k] = v_t[1:-1]
+                    else:
+                        if " #" in v_t:
+                            v_t = v_t.split(" #", 1)[0].strip()
+                        elif v_t.startswith("#"):
+                            v_t = ""
+                        clean[k] = v_t
+                else:
+                    clean[k] = v
+            return clean
+        return values
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
